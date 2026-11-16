@@ -1,9 +1,8 @@
+
 {
-  "name": "Rico Bot",
-  "version": "1.0.1",
-  "description": "Rico Bot — A fast and powerful WhatsApp bot packed with downloaders, AI tools, media editing, and a flexible plugin system. Built for performance and easy customization.",
-  "license": "ISC",
-  "author": "",
+  "name": "rico-bot",
+  "version": "1.0.0",
+  "description": "RICO BOT WhatsApp Platform",
   "type": "module",
   "main": "index.js",
   "engines": {
@@ -15,6 +14,7 @@
   "dependencies": {
     "baileys": "npm:@whiskeysockets/baileys@latest",
     "cheerio": "^1.2.0",
+    "express": "^5.1.0",
     "ffmpeg": "^0.0.4",
     "meowsab": "github:deveni0/meowsab",
     "repossess": "latest",
