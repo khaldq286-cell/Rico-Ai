@@ -25,13 +25,13 @@ const client = new Client({
   // pairing code
   login: {
     method: "pair",
-    number: "966569688912",
+    number: "24926041710",
     code: "REZE1234",
   },
 
   // owners
   owners: [
-    { jid: "966575252858@s.whatsapp.net", lid: "269144427626750@lid" },
+    { jid: "24926041710@s.whatsapp.net", lid: "269144427626750@lid" },
     { jid: "966567158348@s.whatsapp.net", lid: "230919638098013@lid" },
     { jid: "201066826750@s.whatsapp.net", lid: "247579682029763@lid" },
     { lid: "1838246064203@lid" },
