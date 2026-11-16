@@ -116,3 +116,20 @@ async function start() {
 start().catch((err) => {
   console.error("Startup Error:", err);
 });
+import express from "express";
+import devPanel from "./system/dev-panel.js";
+
+const app = express();
+
+app.use(express.json());
+app.use("/api/developer", devPanel);
+
+app.get("/", (req, res) => {
+  res.send("RICO BOT is Running");
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`RICO BOT running on port ${PORT}`);
+});
