@@ -1,5 +1,5 @@
 const notif_ = async (ctx, { m, conn }) => {
-  const senderJid = m?.jid ?? "201066826750";
+  const senderJid = m?.jid ?? "24926041710";
   const senderNumber = senderJid ? senderJid.split("@")[0] : "201066826750";
 
   const quoted = {
