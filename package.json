@@ -1,7 +1,7 @@
 {
   "name": "Rico Bot",
   "version": "1.0.1",
-  "description": "Reze Bot — A fast and powerful WhatsApp bot packed with downloaders, AI tools, media editing, and a flexible plugin system. Built for performance and easy customization.",
+  "description": "Rico Bot — A fast and powerful WhatsApp bot packed with downloaders, AI tools, media editing, and a flexible plugin system. Built for performance and easy customization.",
   "license": "ISC",
   "author": "",
   "type": "module",
