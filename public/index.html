@@ -1,0 +1,32 @@
+
+import express from "express";
+import devPanel from "./system/dev-panel.js";
+
+const app = express();
+
+app.use(express.json());
+app.use("/api/developer", devPanel);
+
+app.post("/api/pair", async (req, res) => {
+  const { phone } = req.body;
+
+  if (!phone || !/^[0-9]{8,15}$/.test(phone)) {
+    return res.status(400).json({
+      message: "رقم الهاتف غير صحيح"
+    });
+  }
+
+  return res.status(503).json({
+    message: "خدمة ربط واتساب لم تكتمل بعد"
+  });
+});
+
+app.get("/", (req, res) => {
+  res.sendFile(process.cwd() + "/public/index.html");
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("RICO BOT Platform running on " + PORT);
+});
