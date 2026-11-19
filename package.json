@@ -1,25 +1,19 @@
-
 {
-  "name": "rico-bot",
-  "version": "1.0.0",
-  "description": "RICO BOT WhatsApp Platform",
+  "name": "rico-bot-v2",
+  "version": "2.0.0",
+  "private": true,
   "type": "module",
-  "main": "index.js",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
   "engines": {
     "node": ">=20"
   },
-  "scripts": {
-    "start": "node index.js"
-  },
   "dependencies": {
-    "baileys": "npm:@whiskeysockets/baileys@latest",
-    "cheerio": "^1.2.0",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
     "express": "^5.1.0",
-    "ffmpeg": "^0.0.4",
-    "meowsab": "github:deveni0/meowsab",
-    "repossess": "latest",
-    "qs": "^6.16.1",
-    "sharp": "^0.35.5",
-    "undici": "^8.12.2"
+    "pino": "^9.6.0",
+    "@hapi/boom": "^9.1.3"
   }
 }
