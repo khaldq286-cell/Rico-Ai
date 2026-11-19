@@ -1,48 +1,395 @@
 
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#111044"/>
-      <stop offset="50%" stop-color="#6324c9"/>
-      <stop offset="100%" stop-color="#087bff"/>
-    </linearGradient>
-    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#172044"/>
-      <stop offset="100%" stop-color="#090817"/>
-    </linearGradient>
-  </defs>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-  <circle cx="250" cy="250" r="250" fill="url(#bg)"/>
-  <circle cx="250" cy="250" r="205" fill="none" stroke="#ffd447" stroke-width="7"/>
-  <circle cx="250" cy="250" r="190" fill="none" stroke="#8ceaff" stroke-width="3"/>
+:root {
+  --purple: #761cff;
+  --blue: #087bff;
+  --gold: #ffd447;
+  --dark: #080719;
+  --white: #ffffff;
+}
 
-  <path d="M95 500 Q105 365 190 350 L310 350 Q395 365 405 500Z" fill="#10152f"/>
-  <path d="M180 355 L250 430 L320 355 L300 500 L200 500Z" fill="#252b55"/>
-  <path d="M210 350 L250 410 L290 350" fill="#ffd447"/>
+body {
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  color: var(--white);
+  background: var(--dark);
+  overflow-x: hidden;
+}
 
-  <path d="M155 210 Q125 70 250 65 Q380 65 350 230 L335 330 Q250 390 165 320Z" fill="url(#hair)"/>
-  <ellipse cx="250" cy="230" rx="94" ry="119" fill="#e9b895"/>
+.background-effects {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: linear-gradient(
+    125deg,
+    #080719,
+    #21105a,
+    #071c45,
+    #32105b,
+    #080719
+  );
+  background-size: 400% 400%;
+  animation: backgroundMove 15s ease infinite;
+}
 
-  <path d="M155 205 Q130 65 250 60 Q365 60 350 190 L320 145 Q280 175 220 130 Q195 185 155 205Z" fill="#111426"/>
-  <path d="M160 180 Q105 110 170 85 L200 145Z" fill="#111426"/>
-  <path d="M335 180 Q395 110 330 85 L300 145Z" fill="#111426"/>
+@keyframes backgroundMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
 
-  <path d="M180 215 Q205 190 230 215" fill="none" stroke="#25213a" stroke-width="9" stroke-linecap="round"/>
-  <path d="M270 215 Q295 190 320 215" fill="none" stroke="#25213a" stroke-width="9" stroke-linecap="round"/>
+.glow {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: .5;
+}
 
-  <ellipse cx="207" cy="238" rx="15" ry="21" fill="#fff"/>
-  <ellipse cx="293" cy="238" rx="15" ry="21" fill="#fff"/>
-  <ellipse cx="210" cy="240" rx="9" ry="15" fill="#087bff"/>
-  <ellipse cx="290" cy="240" rx="9" ry="15" fill="#087bff"/>
-  <circle cx="213" cy="239" r="4" fill="#fff"/>
-  <circle cx="293" cy="239" r="4" fill="#fff"/>
+.glow-one {
+  background: #761cff;
+  top: 5%;
+  right: -100px;
+}
 
-  <path d="M240 285 Q250 292 260 285" fill="none" stroke="#a65e62" stroke-width="4" stroke-linecap="round"/>
-  <path d="M220 315 Q250 333 280 315" fill="none" stroke="#8e3f55" stroke-width="5" stroke-linecap="round"/>
+.glow-two {
+  background: #087bff;
+  bottom: 5%;
+  left: -100px;
+}
 
-  <path d="M165 195 L130 280 L175 260" fill="#111426"/>
-  <path d="M335 195 L370 280 L325 260" fill="#111426"/>
+.glow-three {
+  background: #ffd447;
+  top: 45%;
+  left: 40%;
+  opacity: .12;
+}
 
-  <text x="250" y="465" text-anchor="middle" font-family="Arial" font-size="27" font-weight="bold" fill="#ffd447">RICO BOT</text>
-</svg>
+.electric-lines {
+  position: absolute;
+  inset: 0;
+  opacity: .18;
+  background: repeating-linear-gradient(
+    115deg,
+    transparent 0px,
+    transparent 90px,
+    #ffd447 92px,
+    transparent 94px
+  );
+  animation: electricMove 8s linear infinite;
+}
 
+@keyframes electricMove {
+  from { transform: translateX(-100px); }
+  to { transform: translateX(100px); }
+}
+
+.topbar {
+  width: 100%;
+  min-height: 75px;
+  padding: 15px 6%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(5, 5, 20, .7);
+  border-bottom: 1px solid rgba(255, 212, 71, .3);
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 23px;
+  font-weight: bold;
+  color: var(--gold);
+}
+
+.brand img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.channel-link {
+  text-decoration: none;
+  color: white;
+  background: #128c50;
+  padding: 11px 18px;
+  border-radius: 25px;
+  font-size: 13px;
+}
+
+.container {
+  width: min(100% - 30px, 650px);
+  margin: auto;
+  padding: 35px 0;
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: 35px;
+}
+
+/* دائرة الشخصية */
+.avatar-circle {
+  width: 200px;
+  height: 200px;
+  margin: 10px auto 25px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #24105e, #087bff);
+  border: 4px solid var(--gold);
+  box-shadow:
+    0 0 15px #087bff,
+    0 0 30px #761cff,
+    0 0 45px rgba(255, 212, 71, .5);
+  animation: avatarGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes avatarGlow {
+  from {
+    box-shadow: 0 0 15px #087bff, 0 0 25px #761cff;
+  }
+  to {
+    box-shadow: 0 0 25px #ffd447, 0 0 45px #087bff;
+  }
+}
+
+.avatar-circle img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  position: relative;
+  z-index: 2;
+}
+
+.avatar-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 25px rgba(255, 212, 71, .7);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.hero h1 {
+  font-size: 27px;
+  margin-bottom: 12px;
+}
+
+.hero h1 span {
+  color: var(--gold);
+  text-shadow: 0 0 15px #ffd447;
+}
+
+.subtitle {
+  color: #c5c3e8;
+  font-size: 14px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 9px 18px;
+  background: rgba(255,255,255,.08);
+  border-radius: 30px;
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  background: #25e879;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #25e879;
+}
+
+.panel {
+  background: rgba(12, 12, 35, .85);
+  border: 1px solid rgba(255, 212, 71, .25);
+  border-radius: 20px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 10px 35px rgba(0,0,0,.3);
+  backdrop-filter: blur(15px);
+}
+
+.panel h2 {
+  color: var(--gold);
+  margin-bottom: 12px;
+  font-size: 21px;
+}
+
+.description {
+  color: #b8b7d5;
+  font-size: 13px;
+  margin-bottom: 22px;
+  line-height: 1.8;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+label {
+  font-size: 13px;
+  color: #e2dcff;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 14px;
+  color: white;
+  background: #17152f;
+  border: 1px solid #48406d;
+  border-radius: 10px;
+  outline: none;
+  font-size: 14px;
+}
+
+select option {
+  background: #17152f;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(255,212,71,.2);
+}
+
+button {
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  color: #171020;
+  background: linear-gradient(100deg, #ffd447, #ffae27);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: .2s;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 18px rgba(255,212,71,.4);
+}
+
+#result {
+  display: none;
+  text-align: center;
+  padding: 20px;
+  background: rgba(118,28,255,.15);
+  border: 1px solid #761cff;
+  border-radius: 15px;
+}
+
+#result h3 {
+  color: var(--gold);
+  margin-bottom: 15px;
+}
+
+#pairCode {
+  display: block;
+  color: var(--gold);
+  font-size: 30px;
+  font-weight: bold;
+  letter-spacing: 5px;
+  margin-bottom: 15px;
+}
+
+#result p {
+  color: #c7c5e6;
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+#message {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--gold);
+}
+
+.developer-panel {
+  border-color: rgba(118,28,255,.5);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.stat-card {
+  padding: 18px 10px;
+  text-align: center;
+  background: rgba(118,28,255,.15);
+  border: 1px solid rgba(118,28,255,.4);
+  border-radius: 12px;
+}
+
+.stat-card span {
+  display: block;
+  font-size: 12px;
+  color: #c8c4e7;
+  margin-bottom: 10px;
+}
+
+.stat-card strong {
+  color: var(--gold);
+  font-size: 23px;
+}
+
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #9995bd;
+  font-size: 12px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 480px) {
+  .avatar-circle {
+    width: 175px;
+    height: 175px;
+  }
+
+  .hero h1 {
+    font-size: 22px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .brand {
+    font-size: 19px;
+  }
+}
