@@ -1,32 +1,396 @@
 
-import express from "express";
-import devPanel from "./system/dev-panel.js";
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RICO BOT</title>
 
-const app = express();
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;
+ min-height:100vh;
+ color:white;
+ font-family:Tahoma,Arial,sans-serif;
+ background:linear-gradient(-45deg,#080018,#170044,#001b49,#260052,#080018);
+ background-size:400% 400%;
+ animation:bgMove 12s ease infinite;
+ overflow-x:hidden;
+}
+@keyframes bgMove{
+ 0%{background-position:0% 50%}
+ 50%{background-position:100% 50%}
+ 100%{background-position:0% 50%}
+}
+body:before,body:after{
+ content:"";
+ position:fixed;
+ width:350px;height:350px;
+ border-radius:50%;
+ filter:blur(100px);
+ opacity:.55;
+ pointer-events:none;
+ animation:float 8s ease-in-out infinite alternate;
+}
+body:before{background:#8b00ff;top:5%;right:-150px}
+body:after{background:#008cff;bottom:0;left:-150px;animation-delay:2s}
+@keyframes float{
+ from{transform:translateY(-40px)}
+ to{transform:translateY(80px)}
+}
+.lightning{
+ position:fixed;inset:0;pointer-events:none;opacity:.2;
+ background:repeating-linear-gradient(125deg,transparent 0 80px,#a855f7 81px,transparent 83px 160px);
+ animation:flash 4s linear infinite;
+}
+@keyframes flash{0%,90%,100%{opacity:.08}92%{opacity:.4}94%{opacity:.1}}
+.container{width:min(950px,94%);margin:auto;position:relative;z-index:1}
+header{text-align:center;padding:30px 10px 15px}
+.logo{
+ font-size:clamp(38px,8vw,65px);
+ font-weight:1000;letter-spacing:3px;
+ color:#ffe66b;
+ text-shadow:0 0 10px #ffbd00,0 0 30px #9c36ff,3px 4px #5a1b9b;
+}
+.subtitle{color:#d9caff;font-size:17px;margin-top:8px}
+.hero{
+ width:230px;height:230px;margin:20px auto;
+ border-radius:50%;position:relative;
+ display:grid;place-items:center;
+ border:4px solid #ffdb55;
+ box-shadow:0 0 18px #ffcc33,0 0 45px #8b27ff,inset 0 0 25px #7124ff;
+ animation:ring 3s ease-in-out infinite;
+}
+@keyframes ring{
+ 50%{box-shadow:0 0 35px #ffcc33,0 0 75px #8b27ff,inset 0 0 35px #7124ff}
+}
+.hero img{
+ width:94%;height:94%;object-fit:cover;border-radius:50%;
+}
+.whatsapp{
+ position:absolute;bottom:5px;left:-18px;
+ width:62px;height:62px;border-radius:50%;
+ background:#13d66b;display:grid;place-items:center;
+ font-size:34px;border:4px solid white;
+ box-shadow:0 0 20px #00ff83;
+ animation:pulse 1.8s infinite;
+}
+@keyframes pulse{50%{transform:scale(1.13)}}
+.card{
+ background:rgba(5,5,25,.78);
+ border:1px solid #9b4dff;
+ border-radius:18px;padding:22px;margin:18px 0;
+ box-shadow:0 0 18px #6815bc,inset 0 0 18px #291052;
+ backdrop-filter:blur(10px);
+}
+h2{text-align:center;color:#ffdc63;margin:5px 0 20px}
+input,select{
+ width:100%;padding:15px;margin:8px 0;
+ border-radius:12px;border:1px solid #9b66ff;
+ background:#100b29;color:white;font-size:16px;outline:none;
+}
+button{
+ width:100%;padding:15px;border:0;border-radius:12px;
+ background:linear-gradient(90deg,#ffca28,#fff18a,#ffad00);
+ color:#170b25;font-size:18px;font-weight:bold;
+ cursor:pointer;box-shadow:0 0 18px #ffbd00;
+ transition:.2s;
+}
+button:hover{transform:scale(1.02);filter:brightness(1.1)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.secondary{
+ background:linear-gradient(90deg,#5422b9,#087bce);
+ color:white;box-shadow:0 0 15px #642cff;
+}
+#result{
+ display:none;text-align:center;margin-top:18px;
+ padding:18px;border:1px dashed #ffd84d;border-radius:12px;
+}
+#pairCode{font-size:30px;letter-spacing:5px;color:#ffe66b;font-weight:bold}
+#message{color:#ddd;margin:10px 0}
+.links{display:flex;gap:12px;flex-wrap:wrap}
+.links a{
+ flex:1;min-width:130px;text-align:center;text-decoration:none;
+ padding:14px;border-radius:12px;color:white;
+ background:linear-gradient(90deg,#4920a2,#075b9d);
+ border:1px solid #a878ff;
+}
+.flags{
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(85px,1fr));
+ gap:8px;margin-top:15px;
+}
+.flag{
+ text-align:center;background:#17102e;border:1px solid #6336a0;
+ border-radius:10px;padding:9px;font-size:13px;
+}
+.flag b{display:block;font-size:24px;margin-bottom:5px}
+#developerPanel{display:none}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{
+ background:#160c35;border:1px solid #7442bd;
+ border-radius:12px;padding:15px;text-align:center
+}
+.stat strong{display:block;color:#ffdc63;font-size:24px}
+.small{font-size:12px;color:#c7b8e7;text-align:center}
+footer{text-align:center;padding:25px;color:#ffdb62}
+</style>
+</head>
 
-app.use(express.json());
-app.use("/api/developer", devPanel);
+<body>
+<div class="lightning"></div>
 
-app.post("/api/pair", async (req, res) => {
-  const { phone } = req.body;
+<div class="container">
+<header>
+ <div class="logo">👑 RICO BOT</div>
+ <div class="subtitle">مرحــباً بك في منصة ريكو بوت</div>
 
-  if (!phone || !/^[0-9]{8,15}$/.test(phone)) {
-    return res.status(400).json({
-      message: "رقم الهاتف غير صحيح"
-    });
-  }
+ <div class="hero">
+  <img src="/rimo-anime.png" alt="RICO BOT Anime">
+  <div class="whatsapp">☎</div>
+ </div>
 
-  return res.status(503).json({
-    message: "خدمة ربط واتساب لم تكتمل بعد"
+ <div class="subtitle">منصتك الذكية لربط بوت واتساب الفرعي</div>
+</header>
+
+<section class="card">
+ <h2>⚡ تنصيب البوت الفرعي ⚡</h2>
+
+ <label>اختر الدولة</label>
+ <select id="country">
+  <option value="249">🇸🇩 السودان (+249)</option>
+  <option value="20">🇪🇬 مصر (+20)</option>
+  <option value="966">🇸🇦 السعودية (+966)</option>
+  <option value="971">🇦🇪 الإمارات (+971)</option>
+  <option value="967">🇾🇪 اليمن (+967)</option>
+  <option value="964">🇮🇶 العراق (+964)</option>
+  <option value="962">🇯🇴 الأردن (+962)</option>
+  <option value="965">🇰🇼 الكويت (+965)</option>
+  <option value="974">🇶🇦 قطر (+974)</option>
+  <option value="968">🇴🇲 عُمان (+968)</option>
+  <option value="973">🇧🇭 البحرين (+973)</option>
+  <option value="961">🇱🇧 لبنان (+961)</option>
+  <option value="963">🇸🇾 سوريا (+963)</option>
+  <option value="970">🇵🇸 فلسطين (+970)</option>
+  <option value="218">🇱🇾 ليبيا (+218)</option>
+  <option value="216">🇹🇳 تونس (+216)</option>
+  <option value="213">🇩🇿 الجزائر (+213)</option>
+  <option value="212">🇲🇦 المغرب (+212)</option>
+  <option value="222">🇲🇷 موريتانيا (+222)</option>
+  <option value="253">🇩🇯 جيبوتي (+253)</option>
+  <option value="252">🇸🇴 الصومال (+252)</option>
+  <option value="269">🇰🇲 جزر القمر (+269)</option>
+ </select>
+
+ <label>رقم واتساب بدون الصفر الأول</label>
+ <input id="phone" type="tel" placeholder="مثال: 912345678">
+
+ <button id="installBtn" onclick="installBot()">⚡ تنصيب البوت ⚡</button>
+
+ <div id="result">
+  <p id="message">جاري تجهيز كود الربط...</p>
+  <div id="pairCode"></div>
+  <button class="secondary" onclick="copyCode()">نسخ كود الربط</button>
+  <p>صلاحية الكود: <span id="timer">120</span> ثانية</p>
+ </div>
+</section>
+
+<section class="card">
+ <h2>📌 طريقة التنصيب</h2>
+ <div class="links">
+  <a>① افتح واتساب</a>
+  <a>② الأجهزة المرتبطة</a>
+  <a>③ ربط جهاز</a>
+ </div>
+ <p class="small">اتبع التعليمات الظاهرة في واتساب لإكمال الربط.</p>
+</section>
+
+<section class="card">
+ <h2>🌍 الدول العربية المدعومة</h2>
+ <div class="flags">
+  <div class="flag"><b>🇸🇩</b>السودان +249</div>
+  <div class="flag"><b>🇪🇬</b>مصر +20</div>
+  <div class="flag"><b>🇸🇦</b>السعودية +966</div>
+  <div class="flag"><b>🇦🇪</b>الإمارات +971</div>
+  <div class="flag"><b>🇾🇪</b>اليمن +967</div>
+  <div class="flag"><b>🇮🇶</b>العراق +964</div>
+  <div class="flag"><b>🇯🇴</b>الأردن +962</div>
+  <div class="flag"><b>🇰🇼</b>الكويت +965</div>
+  <div class="flag"><b>🇶🇦</b>قطر +974</div>
+  <div class="flag"><b>🇴🇲</b>عُمان +968</div>
+  <div class="flag"><b>🇧🇭</b>البحرين +973</div>
+  <div class="flag"><b>🇱🇧</b>لبنان +961</div>
+  <div class="flag"><b>🇸🇾</b>سوريا +963</div>
+  <div class="flag"><b>🇵🇸</b>فلسطين +970</div>
+  <div class="flag"><b>🇱🇾</b>ليبيا +218</div>
+  <div class="flag"><b>🇹🇳</b>تونس +216</div>
+  <div class="flag"><b>🇩🇿</b>الجزائر +213</div>
+  <div class="flag"><b>🇲🇦</b>المغرب +212</div>
+  <div class="flag"><b>🇲🇷</b>موريتانيا +222</div>
+  <div class="flag"><b>🇩🇯</b>جيبوتي +253</div>
+  <div class="flag"><b>🇸🇴</b>الصومال +252</div>
+  <div class="flag"><b>🇰🇲</b>جزر القمر +269</div>
+ </div>
+</section>
+
+<section class="card">
+ <h2>👑 لوحة المطور</h2>
+ <input id="devPassword" type="password" placeholder="كلمة مرور المطور">
+ <button class="secondary" onclick="developerLogin()">دخول لوحة المطور</button>
+
+ <div id="developerPanel">
+  <h2>إحصائيات المنصة</h2>
+  <div class="stats">
+   <div class="stat">المستخدمون<strong id="users">—</strong></div>
+   <div class="stat">الاتصالات<strong id="connections">—</strong></div>
+   <div class="stat">الفاشلة<strong id="failed">—</strong></div>
+   <div class="stat">حد التنصيب<strong id="limit">—</strong></div>
+  </div>
+  <select id="period" onchange="loadStats()">
+   <option value="day">اليوم</option>
+   <option value="week">الأسبوع</option>
+   <option value="month">الشهر</option>
+  </select>
+  <button class="secondary" onclick="loadStats()">تحديث الإحصائيات</button>
+  <input id="newLimit" type="number" placeholder="الحد الجديد للتنصيب">
+  <button onclick="updateLimit()">تعديل الحد</button>
+  <input id="banNumber" placeholder="رقم المستخدم للحظر أو فك الحظر">
+  <div class="links">
+   <button class="secondary" onclick="userAction('ban')">حظر</button>
+   <button class="secondary" onclick="userAction('unban')">فك الحظر</button>
+  </div>
+  <input id="announcement" placeholder="اكتب الإعلان">
+  <button onclick="sendAnnouncement()">إرسال إعلان</button>
+ </div>
+</section>
+
+<section class="card">
+ <div class="links">
+  <a href="https://whatsapp.com/channel/0029VbE0UbjKwqSYg0WUxu42" target="_blank">📢 قناة RICO BOT</a>
+ </div>
+</section>
+
+<footer>👑 RICO BOT © جميع الحقوق محفوظة</footer>
+</div>
+
+<script>
+let countdown;
+
+async function installBot(){
+ const country=document.getElementById("country").value;
+ const phone=document.getElementById("phone").value.replace(/\D/g,"");
+ const btn=document.getElementById("installBtn");
+ const result=document.getElementById("result");
+ const message=document.getElementById("message");
+
+ if(!phone || phone.length<6){
+  alert("أدخل رقم واتساب صحيح");
+  return;
+ }
+
+ btn.disabled=true;
+ message.textContent="جاري طلب كود الربط...";
+ result.style.display="block";
+ document.getElementById("pairCode").textContent="";
+
+ try{
+  const response=await fetch("/api/pair",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({phone:country+phone})
   });
-});
+  const data=await response.json();
 
-app.get("/", (req, res) => {
-  res.sendFile(process.cwd() + "/public/index.html");
-});
+  if(!response.ok) throw new Error(data.message||"تعذر إنشاء كود الربط");
 
-const PORT = process.env.PORT || 3000;
+  document.getElementById("pairCode").textContent=data.code||"";
+  message.textContent=data.message||"أكمل الربط من واتساب";
+  startTimer();
+ }catch(error){
+  message.textContent=error.message;
+ }finally{
+  btn.disabled=false;
+ }
+}
 
-app.listen(PORT, () => {
-  console.log("RICO BOT Platform running on " + PORT);
-});
+function startTimer(){
+ clearInterval(countdown);
+ let seconds=120;
+ document.getElementById("timer").textContent=seconds;
+ countdown=setInterval(()=>{
+  seconds--;
+  document.getElementById("timer").textContent=seconds;
+  if(seconds<=0){
+   clearInterval(countdown);
+   document.getElementById("message").textContent="انتهت صلاحية الكود، اطلب كوداً جديداً";
+  }
+ },1000);
+}
+
+function copyCode(){
+ const code=document.getElementById("pairCode").textContent;
+ if(code) navigator.clipboard.writeText(code);
+}
+
+async function developerLogin(){
+ const password=document.getElementById("devPassword").value;
+ try{
+  const response=await fetch("/api/developer/login",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({password})
+  });
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.message||"كلمة المرور غير صحيحة");
+  document.getElementById("developerPanel").style.display="block";
+  loadStats();
+ }catch(error){alert(error.message)}
+}
+
+async function loadStats(){
+ try{
+  const period=document.getElementById("period").value;
+  const response=await fetch("/api/developer/stats?period="+period);
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.message||"تعذر تحميل الإحصائيات");
+  document.getElementById("users").textContent=data.users??0;
+  document.getElementById("connections").textContent=data.connections??0;
+  document.getElementById("failed").textContent=data.failed??0;
+  document.getElementById("limit").textContent=data.limit??0;
+ }catch(error){alert(error.message)}
+}
+
+async function updateLimit(){
+ await sendAction("/api/developer/limit",{
+  limit:Number(document.getElementById("newLimit").value)
+ });
+ loadStats();
+}
+
+async function userAction(action){
+ await sendAction("/api/developer/"+action,{
+  phone:document.getElementById("banNumber").value
+ });
+}
+
+async function sendAnnouncement(){
+ await sendAction("/api/developer/announce",{
+  message:document.getElementById("announcement").value
+ });
+}
+
+async function sendAction(url,body){
+ try{
+  const response=await fetch(url,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify(body)
+  });
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.message||"لم تنجح العملية");
+  alert(data.message||"تم تنفيذ الطلب");
+ }catch(error){alert(error.message)}
+}
+</script>
+</body>
+</html>
