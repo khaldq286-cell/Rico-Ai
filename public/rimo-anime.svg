@@ -1,0 +1,48 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#111044"/>
+      <stop offset="50%" stop-color="#6324c9"/>
+      <stop offset="100%" stop-color="#087bff"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#172044"/>
+      <stop offset="100%" stop-color="#090817"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="250" cy="250" r="250" fill="url(#bg)"/>
+  <circle cx="250" cy="250" r="205" fill="none" stroke="#ffd447" stroke-width="7"/>
+  <circle cx="250" cy="250" r="190" fill="none" stroke="#8ceaff" stroke-width="3"/>
+
+  <path d="M95 500 Q105 365 190 350 L310 350 Q395 365 405 500Z" fill="#10152f"/>
+  <path d="M180 355 L250 430 L320 355 L300 500 L200 500Z" fill="#252b55"/>
+  <path d="M210 350 L250 410 L290 350" fill="#ffd447"/>
+
+  <path d="M155 210 Q125 70 250 65 Q380 65 350 230 L335 330 Q250 390 165 320Z" fill="url(#hair)"/>
+  <ellipse cx="250" cy="230" rx="94" ry="119" fill="#e9b895"/>
+
+  <path d="M155 205 Q130 65 250 60 Q365 60 350 190 L320 145 Q280 175 220 130 Q195 185 155 205Z" fill="#111426"/>
+  <path d="M160 180 Q105 110 170 85 L200 145Z" fill="#111426"/>
+  <path d="M335 180 Q395 110 330 85 L300 145Z" fill="#111426"/>
+
+  <path d="M180 215 Q205 190 230 215" fill="none" stroke="#25213a" stroke-width="9" stroke-linecap="round"/>
+  <path d="M270 215 Q295 190 320 215" fill="none" stroke="#25213a" stroke-width="9" stroke-linecap="round"/>
+
+  <ellipse cx="207" cy="238" rx="15" ry="21" fill="#fff"/>
+  <ellipse cx="293" cy="238" rx="15" ry="21" fill="#fff"/>
+  <ellipse cx="210" cy="240" rx="9" ry="15" fill="#087bff"/>
+  <ellipse cx="290" cy="240" rx="9" ry="15" fill="#087bff"/>
+  <circle cx="213" cy="239" r="4" fill="#fff"/>
+  <circle cx="293" cy="239" r="4" fill="#fff"/>
+
+  <path d="M240 285 Q250 292 260 285" fill="none" stroke="#a65e62" stroke-width="4" stroke-linecap="round"/>
+  <path d="M220 315 Q250 333 280 315" fill="none" stroke="#8e3f55" stroke-width="5" stroke-linecap="round"/>
+
+  <path d="M165 195 L130 280 L175 260" fill="#111426"/>
+  <path d="M335 195 L370 280 L325 260" fill="#111426"/>
+
+  <text x="250" y="465" text-anchor="middle" font-family="Arial" font-size="27" font-weight="bold" fill="#ffd447">RICO BOT</text>
+</svg>
+
