@@ -10,6 +10,13 @@ const pino = require("pino");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ==============================
+// RICO BOT SETTINGS
+// ==============================
+
+const ADMIN_ACTIVATION_CODE =
+  process.env.RICO_ADMIN_ACTIVATION_CODE || "RICO-ADMIN-2010";
+
 const DATA_DIR = path.join(__dirname, "database");
 const SESSION_DIR = path.join(__dirname, "sessions");
 const DB_FILE = path.join(DATA_DIR, "database.json");
@@ -35,6 +42,10 @@ let db = {
   failedConnections: 0,
   announcements: []
 };
+
+// ==============================
+// DATABASE
+// ==============================
 
 function loadDatabase() {
   try {
@@ -68,6 +79,10 @@ function saveDatabase() {
 
 loadDatabase();
 
+// ==============================
+// GENERAL HELPERS
+// ==============================
+
 function cleanPhone(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -85,26 +100,38 @@ function getToken(req) {
 
 function requireAdmin(req, res, next) {
   const token = getToken(req);
+  const expiresAt = token ? adminTokens.get(token) : null;
 
-  if (!token || !adminTokens.has(token)) {
+  if (!token || !expiresAt || expiresAt < Date.now()) {
+    if (token) adminTokens.delete(token);
+
     return res.status(401).json({
       success: false,
-      message: "غير مصرح لك"
+      message: "انتهت جلسة المطور، سجل الدخول من جديد"
     });
   }
 
   next();
 }
 
-// إنشاء اتصال واتساب
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ==============================
+// WHATSAPP CONNECTION
+// ==============================
+
 async function createWhatsAppSocket(
   phone,
   authPath,
   session,
-  pairingHandler = null
+  authState = null
 ) {
-  const { state, saveCreds } =
+  const auth = authState ||
     await useMultiFileAuthState(authPath);
+
+  const { state, saveCreds } = auth;
 
   session.state = state;
   session.saveCreds = saveCreds;
@@ -120,25 +147,7 @@ async function createWhatsAppSocket(
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async update => {
-    const { connection, qr, lastDisconnect } = update;
-
-    // طلب كود الاقتران بعد ظهور إشارة QR
-    if (
-      qr &&
-      pairingHandler &&
-      !session.pairingRequested &&
-      !state.creds.registered
-    ) {
-      session.pairingRequested = true;
-
-      try {
-        const code = await sock.requestPairingCode(phone);
-        pairingHandler.resolve(code);
-      } catch (error) {
-        console.error("PAIRING CODE ERROR:", error);
-        pairingHandler.reject(error);
-      }
-    }
+    const { connection, lastDisconnect } = update;
 
     if (connection === "open") {
       const wasConnected = session.status === "connected";
@@ -158,20 +167,13 @@ async function createWhatsAppSocket(
       const statusCode =
         lastDisconnect?.error?.output?.statusCode;
 
-      console.error(
+      console.log(
         "WHATSAPP DISCONNECTED:",
         phone,
-        "CODE:",
         statusCode
       );
 
       session.status = "disconnected";
-
-      if (pairingHandler && !session.pairingRequested) {
-        pairingHandler.reject(
-          new Error("اتصال واتساب انقطع قبل طلب كود الاقتران")
-        );
-      }
 
       if (statusCode === DisconnectReason.loggedOut) {
         sessions.delete(phone);
@@ -179,15 +181,14 @@ async function createWhatsAppSocket(
         return;
       }
 
-      // إعادة الاتصال عند الحاجة، بما فيها restartRequired
       if (
         sessions.get(phone) === session &&
         !session.reconnectTimer
       ) {
-        session.retryCount = (session.retryCount || 0) + 1;
+        session.retryCount =
+          (session.retryCount || 0) + 1;
 
         if (session.retryCount > 5) {
-          session.status = "disconnected";
           console.error("RECONNECT LIMIT REACHED:", phone);
           return;
         }
@@ -208,8 +209,7 @@ async function createWhatsAppSocket(
             await createWhatsAppSocket(
               phone,
               authPath,
-              session,
-              null
+              session
             );
           } catch (error) {
             console.error("RECONNECT ERROR:", error.message);
@@ -223,12 +223,20 @@ async function createWhatsAppSocket(
   return sock;
 }
 
-// الصفحة الرئيسية
+// ==============================
+// HOME PAGE
+// ==============================
+
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(
+    path.join(__dirname, "public", "index.html")
+  );
 });
 
-// طلب كود الاقتران
+// ==============================
+// PAIR WHATSAPP
+// ==============================
+
 app.post("/api/pair", async (req, res) => {
   const phone = cleanPhone(req.body.phone);
 
@@ -262,37 +270,24 @@ app.post("/api/pair", async (req, res) => {
 
   const authPath = path.join(SESSION_DIR, phone);
 
-  let sock;
-  let timeout;
-
   const session = {
     sock: null,
     status: "connecting",
     createdAt: Date.now(),
-    pairingRequested: false,
     retryCount: 0,
     reconnectTimer: null
   };
 
   sessions.set(phone, session);
 
-  let resolvePairing;
-  let rejectPairing;
-
-  const pairingPromise = new Promise((resolve, reject) => {
-    resolvePairing = resolve;
-    rejectPairing = reject;
-  });
-
-  const pairingHandler = {
-    resolve: resolvePairing,
-    reject: rejectPairing
-  };
+  let sock;
+  let timeout;
 
   try {
-    const { state } = await useMultiFileAuthState(authPath);
+    const authState =
+      await useMultiFileAuthState(authPath);
 
-    if (state.creds.registered) {
+    if (authState.state.creds.registered) {
       sessions.delete(phone);
 
       return res.status(409).json({
@@ -305,14 +300,25 @@ app.post("/api/pair", async (req, res) => {
       phone,
       authPath,
       session,
-      pairingHandler
+      authState
     );
+
+    // منح الاتصال وقتاً للتهيئة
+    await wait(1500);
+
+    if (authState.state.creds.registered) {
+      throw new Error("هذا الرقم مرتبط مسبقاً");
+    }
+
+    const pairingPromise = sock.requestPairingCode(phone);
 
     const code = await Promise.race([
       pairingPromise,
       new Promise((resolve, reject) => {
         timeout = setTimeout(() => {
-          reject(new Error("انتهت مهلة طلب كود الاقتران"));
+          reject(
+            new Error("انتهت مهلة طلب كود الاقتران")
+          );
         }, 45000);
       })
     ]);
@@ -353,7 +359,10 @@ app.post("/api/pair", async (req, res) => {
   }
 });
 
-// حالة الاتصال
+// ==============================
+// PAIR STATUS
+// ==============================
+
 app.get("/api/pair/status", (req, res) => {
   const phone = cleanPhone(req.query.phone);
   const session = sessions.get(phone);
@@ -363,32 +372,52 @@ app.get("/api/pair/status", (req, res) => {
   });
 });
 
-// تسجيل دخول المطور
+// ==============================
+// DEVELOPER LOGIN
+// ==============================
+
 app.post("/api/developer/login", (req, res) => {
   const password = String(req.body.password || "");
-  const adminPassword = process.env.RICO_ADMIN_PASSWORD;
 
-  if (!adminPassword) {
-    return res.status(503).json({
+  if (!password) {
+    return res.status(400).json({
       success: false,
-      message: "كلمة مرور المطور غير مضبوطة في Render"
+      message: "أدخل كود تفعيل لوحة المطور"
     });
   }
 
-  if (password !== adminPassword) {
+  const validCode =
+    crypto.timingSafeEqual(
+      Buffer.from(
+        crypto.createHash("sha256")
+          .update(password)
+          .digest("hex")
+      ),
+      Buffer.from(
+        crypto.createHash("sha256")
+          .update(ADMIN_ACTIVATION_CODE)
+          .digest("hex")
+      )
+    );
+
+  if (!validCode) {
     return res.status(401).json({
       success: false,
-      message: "كلمة المرور غير صحيحة"
+      message: "كود التفعيل غير صحيح"
     });
   }
 
   const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
 
-  adminTokens.set(token, Date.now());
+  adminTokens.set(token, expiresAt);
+
+  const secure = req.secure ||
+    req.headers["x-forwarded-proto"] === "https";
 
   res.setHeader(
     "Set-Cookie",
-    `rico_admin=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=28800`
+    `rico_admin=${token}; HttpOnly; ${secure ? "Secure;" : ""} SameSite=Lax; Path=/; Max-Age=28800`
   );
 
   res.json({
@@ -397,102 +426,152 @@ app.post("/api/developer/login", (req, res) => {
   });
 });
 
-// تسجيل الخروج
-app.post("/api/developer/logout", requireAdmin, (req, res) => {
-  const token = getToken(req);
+// ==============================
+// DEVELOPER LOGOUT
+// ==============================
 
-  if (token) adminTokens.delete(token);
+app.post(
+  "/api/developer/logout",
+  requireAdmin,
+  (req, res) => {
+    const token = getToken(req);
 
-  res.setHeader(
-    "Set-Cookie",
-    "rico_admin=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
-  );
+    if (token) adminTokens.delete(token);
 
-  res.json({ success: true });
-});
+    res.setHeader(
+      "Set-Cookie",
+      "rico_admin=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
+    );
 
-// إحصائيات المنصة
-app.get("/api/developer/stats", requireAdmin, (req, res) => {
-  res.json({
-    users: sessions.size,
-    connections: db.totalConnections,
-    failed: db.failedConnections,
-    limit: db.installLimit,
-    banned: db.bannedUsers.length
-  });
-});
+    res.json({ success: true });
+  }
+);
 
-// تعديل حد التنصيب
-app.post("/api/developer/limit", requireAdmin, (req, res) => {
-  const limit = Number(req.body.limit);
+// ==============================
+// DEVELOPER STATS
+// ==============================
 
-  if (!Number.isInteger(limit) || limit < 1) {
-    return res.status(400).json({
-      success: false,
-      message: "الحد غير صحيح"
+app.get(
+  "/api/developer/stats",
+  requireAdmin,
+  (req, res) => {
+    res.json({
+      users: sessions.size,
+      connections: db.totalConnections,
+      failed: db.failedConnections,
+      limit: db.installLimit,
+      banned: db.bannedUsers.length
     });
   }
+);
 
-  db.installLimit = limit;
-  saveDatabase();
+// ==============================
+// CHANGE INSTALL LIMIT
+// ==============================
 
-  res.json({ success: true, limit });
-});
+app.post(
+  "/api/developer/limit",
+  requireAdmin,
+  (req, res) => {
+    const limit = Number(req.body.limit);
 
-// حظر رقم
-app.post("/api/developer/ban", requireAdmin, (req, res) => {
-  const phone = cleanPhone(req.body.phone);
+    if (!Number.isInteger(limit) || limit < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "الحد غير صحيح"
+      });
+    }
 
-  if (!validPhone(phone)) {
-    return res.status(400).json({
-      success: false,
-      message: "رقم الهاتف غير صحيح"
-    });
-  }
-
-  if (!db.bannedUsers.includes(phone)) {
-    db.bannedUsers.push(phone);
+    db.installLimit = limit;
     saveDatabase();
-  }
 
-  res.json({ success: true });
-});
-
-// فك الحظر
-app.post("/api/developer/unban", requireAdmin, (req, res) => {
-  const phone = cleanPhone(req.body.phone);
-
-  db.bannedUsers =
-    db.bannedUsers.filter(number => number !== phone);
-
-  saveDatabase();
-
-  res.json({ success: true });
-});
-
-// حفظ إعلان
-app.post("/api/developer/announce", requireAdmin, (req, res) => {
-  const message = String(req.body.message || "").trim();
-
-  if (!message) {
-    return res.status(400).json({
-      success: false,
-      message: "الإعلان فارغ"
+    res.json({
+      success: true,
+      limit
     });
   }
+);
 
-  db.announcements.push({
-    id: crypto.randomUUID(),
-    message,
-    date: new Date().toISOString()
-  });
+// ==============================
+// BAN USER
+// ==============================
 
-  saveDatabase();
+app.post(
+  "/api/developer/ban",
+  requireAdmin,
+  (req, res) => {
+    const phone = cleanPhone(req.body.phone);
 
-  res.json({ success: true });
-});
+    if (!validPhone(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: "رقم الهاتف غير صحيح"
+      });
+    }
 
-// فحص السيرفر
+    if (!db.bannedUsers.includes(phone)) {
+      db.bannedUsers.push(phone);
+      saveDatabase();
+    }
+
+    res.json({ success: true });
+  }
+);
+
+// ==============================
+// UNBAN USER
+// ==============================
+
+app.post(
+  "/api/developer/unban",
+  requireAdmin,
+  (req, res) => {
+    const phone = cleanPhone(req.body.phone);
+
+    db.bannedUsers =
+      db.bannedUsers.filter(number => number !== phone);
+
+    saveDatabase();
+
+    res.json({ success: true });
+  }
+);
+
+// ==============================
+// ANNOUNCEMENTS
+// ==============================
+
+app.post(
+  "/api/developer/announce",
+  requireAdmin,
+  (req, res) => {
+    const message = String(
+      req.body.message || ""
+    ).trim();
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: "الإعلان فارغ"
+      });
+    }
+
+    db.announcements.push({
+      id: crypto.randomUUID(),
+      message,
+      date: new Date().toISOString()
+    });
+
+    saveDatabase();
+
+    res.json({ success: true });
+  }
+);
+
+// ==============================
+// HEALTH CHECK
+// ==============================
+
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
@@ -501,7 +580,10 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// معالجة الأخطاء
+// ==============================
+// ERROR HANDLER
+// ==============================
+
 app.use((error, req, res, next) => {
   console.error("SERVER ERROR:", error);
 
@@ -511,13 +593,18 @@ app.use((error, req, res, next) => {
   });
 });
 
-// تشغيل السيرفر وتحميل Baileys
+// ==============================
+// START SERVER
+// ==============================
+
 async function startServer() {
   try {
-    const baileys = await import("@whiskeysockets/baileys");
+    const baileys =
+      await import("@whiskeysockets/baileys");
 
     makeWASocket = baileys.default;
-    useMultiFileAuthState = baileys.useMultiFileAuthState;
+    useMultiFileAuthState =
+      baileys.useMultiFileAuthState;
     DisconnectReason = baileys.DisconnectReason;
 
     if (
@@ -525,15 +612,17 @@ async function startServer() {
       !useMultiFileAuthState ||
       !DisconnectReason
     ) {
-      throw new Error("تعذر تحميل وظائف Baileys المطلوبة");
+      throw new Error(
+        "تعذر تحميل وظائف Baileys المطلوبة"
+      );
     }
 
     app.listen(PORT, () => {
-      console.log("================================");
+      console.log("==============================");
       console.log("          RICO BOT");
       console.log("       SERVER STARTED");
       console.log("       PORT:", PORT);
-      console.log("================================");
+      console.log("==============================");
     });
 
   } catch (error) {
