@@ -14,20 +14,28 @@ async function connectWhatsApp(phone, sessionDir) {
   } = await createSocket(authPath);
 
   if (state.creds.registered) {
+    sock.end(undefined);
     throw new Error("هذا الرقم مرتبط مسبقاً");
   }
 
-  const code = await sock.requestPairingCode(
-    phone,
-    CUSTOM_PAIRING_CODE
-  );
+  try {
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-  return {
-    code,
-    sock,
-    state,
-    DisconnectReason
-  };
+    const code = await sock.requestPairingCode(
+      phone,
+      CUSTOM_PAIRING_CODE
+    );
+
+    return {
+      code,
+      sock,
+      state,
+      DisconnectReason
+    };
+  } catch (error) {
+    sock.end(undefined);
+    throw error;
+  }
 }
 
 module.exports = connectWhatsApp;
