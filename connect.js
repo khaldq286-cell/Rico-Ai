@@ -1,8 +1,7 @@
-
 const path = require("path");
 const { createSocket } = require("./Socket");
 
-const CUSTOM_PAIRING_CODE = "RKCX2A7B";
+const CUSTOM_PAIRING_CODE = "RICO2010";
 
 async function connectWhatsApp(phone, sessionDir) {
   const authPath = path.join(sessionDir, phone);
