@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#090817">
-  <title>RICO BOT | ULTRA</title>
+  <meta name="theme-color" content="#020b08">
+  <title>RICO BOT | Premium System</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 
@@ -14,273 +14,310 @@
 <div class="background-effects">
   <div class="glow glow-one"></div>
   <div class="glow glow-two"></div>
-  <div class="glow glow-three"></div>
   <div class="electric-lines"></div>
-  <div class="stars"></div>
 </div>
 
 <header class="topbar">
-  <a href="/" class="brand">
+  <a href="#home" class="brand">
     <div class="brand-icon">R</div>
-    <div>
-      <strong>RICO BOT</strong>
-      <small>ULTRA PLATFORM</small>
-    </div>
+    <span>RICO BOT</span>
   </a>
 
-  <a class="channel-link"
-     href="https://whatsapp.com/channel/0029VbE0UbjKwqSYg0WUxu42"
-     target="_blank" rel="noopener">
-    <span>◉</span> قناة واتساب
-  </a>
+  <div class="top-status">
+    <span class="status-dot"></span>
+    منصة ريكو بوت
+  </div>
+
+  <button class="menu-toggle" id="menuToggle" aria-label="القائمة">☰</button>
 </header>
 
-<main class="container">
+<div class="app-layout">
 
-  <section class="hero">
+  <aside class="sidebar" id="sidebar">
 
-    <div class="hero-tag">
-      <span class="status-dot"></span>
-      RICO BOT SYSTEM ONLINE
+    <div class="sidebar-logo">
+      <div class="logo-circle">R</div>
+      <h2>RICO BOT</h2>
+      <p>PREMIUM SYSTEM</p>
+      <span class="online-label">● ONLINE</span>
     </div>
 
-    <div class="avatar-circle">
-      <div class="avatar-glow"></div>
-      <img src="/rimo-anime.png" alt="RICO BOT Anime">
+    <nav class="side-nav">
+      <a href="#home" class="nav-link active">الرئيسية</a>
+      <a href="#install" class="nav-link">تنصيب البوت</a>
+      <a href="#status" class="nav-link">حالة البوت</a>
+      <a href="#developer" class="nav-link">لوحة المطور</a>
+      <a href="https://whatsapp.com/channel/0029VbE0UbjKwqSYg0WUxu42"
+         target="_blank" rel="noopener" class="nav-link">قناة الواتساب</a>
+      <a href="#support" class="nav-link">الدعم والمساعدة</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <h3>RICO BOT</h3>
+      <p>POWERED BY RICO TEAM</p>
     </div>
 
-    <div class="hero-title">
-      <h1>مرحباً بك في</h1>
-      <h1 class="gradient-text">RICO BOT</h1>
-    </div>
+  </aside>
 
-    <p class="subtitle">
-      الجيل الجديد من منصات بوتات واتساب
-    </p>
+  <main class="main-content">
 
-    <div class="hero-features">
-      <span>⚡ سرعة</span>
-      <span>✦ احترافية</span>
-      <span>◈ سهولة</span>
-    </div>
+    <!-- الرئيسية -->
 
-  </section>
+    <section class="hero-section" id="home">
 
-  <section class="panel" id="pairSection">
-
-    <div class="section-heading">
-      <div class="section-icon">◈</div>
-      <div>
-        <h2>ربط حساب واتساب</h2>
-        <p>اربط حسابك وابدأ استخدام البوت</p>
-      </div>
-    </div>
-
-    <form id="pairForm">
-
-      <label for="country">الدولة</label>
-
-      <select id="country" required>
-        <option value="249">🇸🇩 السودان (+249)</option>
-        <option value="20">🇪🇬 مصر (+20)</option>
-        <option value="966">🇸🇦 السعودية (+966)</option>
-        <option value="971">🇦🇪 الإمارات (+971)</option>
-        <option value="967">🇾🇪 اليمن (+967)</option>
-        <option value="964">🇮🇶 العراق (+964)</option>
-        <option value="962">🇯🇴 الأردن (+962)</option>
-        <option value="961">🇱🇧 لبنان (+961)</option>
-        <option value="963">🇸🇾 سوريا (+963)</option>
-        <option value="965">🇰🇼 الكويت (+965)</option>
-        <option value="974">🇶🇦 قطر (+974)</option>
-        <option value="973">🇧🇭 البحرين (+973)</option>
-        <option value="968">🇴🇲 عمان (+968)</option>
-        <option value="212">🇲🇦 المغرب (+212)</option>
-        <option value="213">🇩🇿 الجزائر (+213)</option>
-        <option value="216">🇹🇳 تونس (+216)</option>
-        <option value="218">🇱🇾 ليبيا (+218)</option>
-        <option value="222">🇲🇷 موريتانيا (+222)</option>
-        <option value="253">🇩🇯 جيبوتي (+253)</option>
-        <option value="252">🇸🇴 الصومال (+252)</option>
-        <option value="269">🇰🇲 جزر القمر (+269)</option>
-        <option value="970">🇵🇸 فلسطين (+970)</option>
-      </select>
-
-      <label for="phone">رقم واتساب</label>
-
-      <input
-        id="phone"
-        type="tel"
-        inputmode="numeric"
-        placeholder="أدخل رقمك بدون رمز الدولة"
-        required
-      >
-
-      <button type="submit" class="main-button">
-        <span>⚡</span> إنشاء كود الاقتران
-      </button>
-
-    </form>
-
-    <div id="result">
-
-      <div class="result-heading">
-        <span>✦</span>
-        كود الاقتران
+      <div class="hero-character">
+        <div class="character-ring">
+          <img src="/rimo-anime.png" alt="RICO BOT Anime">
+        </div>
       </div>
 
-      <span id="pairCode"></span>
+      <div class="hero-content">
+        <span class="hero-tag">PREMIUM WHATSAPP SYSTEM</span>
 
-      <button type="button" id="copyCode" class="copy-button">
-        نسخ الكود
-      </button>
+        <h1 class="main-title">RICO BOT</h1>
 
-      <p class="timer-text">
-        صلاحية العرض:
-        <strong id="timer">120</strong>
-        ثانية
-      </p>
+        <h2>مرحباً بك في ريكو بوت</h2>
 
-      <p>أدخل الكود في واتساب لإكمال الربط.</p>
+        <p>
+          منصتك الذكية لتنصيب وتشغيل بوت واتساب
+          وإدارة حسابك بسهولة.
+        </p>
 
-    </div>
-
-    <p id="message"></p>
-
-  </section>
-
-  <section class="developer-panel panel" id="developerSection">
-
-    <div class="section-heading">
-      <div class="section-icon">♛</div>
-      <div>
-        <h2>مركز المطور</h2>
-        <p>RICO BOT CONTROL CENTER</p>
-      </div>
-    </div>
-
-    <form id="developerLogin">
-
-      <label for="adminPassword">كود تفعيل لوحة المطور</label>
-
-      <input
-        type="password"
-        id="adminPassword"
-        placeholder="أدخل كود التفعيل"
-        autocomplete="current-password"
-        required
-      >
-
-      <button type="submit" class="main-button">
-        دخول لوحة المطور
-      </button>
-
-    </form>
-
-    <div id="developerDashboard" hidden>
-
-      <div class="dashboard-title">
-        <h3>إحصائيات المنصة</h3>
-        <span class="online-label">● نشط</span>
+        <a href="#install" class="main-button">
+          تنصيب البوت
+          <span>↗</span>
+        </a>
       </div>
 
-      <div class="stats-grid">
+    </section>
 
-        <div class="stat-card">
-          <span>المستخدمون</span>
-          <strong id="usersCount">0</strong>
-          <small>المستخدمون الحاليون</small>
+    <!-- الإحصائيات -->
+
+    <section class="stats-section" id="status">
+
+      <div class="stat-card">
+        <span>المستخدمون</span>
+        <strong id="usersCount">--</strong>
+      </div>
+
+      <div class="stat-card">
+        <span>الاتصالات</span>
+        <strong id="connectionsCount">--</strong>
+      </div>
+
+      <div class="stat-card">
+        <span>الاتصالات الفاشلة</span>
+        <strong id="failedCount">--</strong>
+      </div>
+
+      <div class="stat-card">
+        <span>حد التنصيب</span>
+        <strong id="limitCount">--</strong>
+      </div>
+
+    </section>
+
+    <!-- تنصيب البوت -->
+
+    <section class="panel install-panel" id="install">
+
+      <div class="section-heading">
+        <span class="section-icon">01</span>
+        <div>
+          <h2>تنصيب البوت</h2>
+          <p>اربط حساب واتساب الخاص بك</p>
+        </div>
+      </div>
+
+      <form id="pairForm">
+
+        <label for="country">الدولة</label>
+
+        <select id="country" required>
+          <option value="249">🇸🇩 السودان (+249)</option>
+          <option value="20">🇪🇬 مصر (+20)</option>
+          <option value="966">🇸🇦 السعودية (+966)</option>
+          <option value="971">🇦🇪 الإمارات (+971)</option>
+          <option value="964">🇮🇶 العراق (+964)</option>
+          <option value="962">🇯🇴 الأردن (+962)</option>
+          <option value="965">🇰🇼 الكويت (+965)</option>
+          <option value="974">🇶🇦 قطر (+974)</option>
+          <option value="973">🇧🇭 البحرين (+973)</option>
+          <option value="968">🇴🇲 عُمان (+968)</option>
+          <option value="967">🇾🇪 اليمن (+967)</option>
+          <option value="961">🇱🇧 لبنان (+961)</option>
+          <option value="963">🇸🇾 سوريا (+963)</option>
+          <option value="212">🇲🇦 المغرب (+212)</option>
+          <option value="213">🇩🇿 الجزائر (+213)</option>
+          <option value="216">🇹🇳 تونس (+216)</option>
+          <option value="218">🇱🇾 ليبيا (+218)</option>
+          <option value="222">🇲🇷 موريتانيا (+222)</option>
+          <option value="252">🇸🇴 الصومال (+252)</option>
+          <option value="253">🇩🇯 جيبوتي (+253)</option>
+          <option value="269">🇰🇲 جزر القمر (+269)</option>
+          <option value="970">🇵🇸 فلسطين (+970)</option>
+        </select>
+
+        <label for="phone">رقم واتساب</label>
+
+        <input
+          type="tel"
+          id="phone"
+          placeholder="أدخل رقم الهاتف بدون رمز الدولة"
+          autocomplete="tel"
+          required
+        >
+
+        <button type="submit" id="pairButton" class="main-button">
+          تنصيب البوت
+          <span>↗</span>
+        </button>
+
+      </form>
+
+      <div id="result" hidden>
+        <h3>رمز الاقتران</h3>
+        <div class="pair-code" id="pairCode"></div>
+        <button type="button" id="copyCode" class="copy-button">
+          نسخ الرمز
+        </button>
+        <p class="timer-text" id="timer"></p>
+      </div>
+
+      <p id="message" role="status" aria-live="polite"></p>
+
+    </section>
+
+    <!-- مميزات المنصة -->
+
+    <section class="features-section">
+
+      <div class="feature-card">
+        <h3>حماية الحساب</h3>
+        <p>إدارة الاتصال والجلسات</p>
+      </div>
+
+      <div class="feature-card">
+        <h3>سرعة التشغيل</h3>
+        <p>واجهة سهلة وسريعة</p>
+      </div>
+
+      <div class="feature-card">
+        <h3>إدارة النظام</h3>
+        <p>تحكم مركزي بالمنصة</p>
+      </div>
+
+    </section>
+
+    <!-- لوحة المطور -->
+
+    <section class="panel developer-panel" id="developer">
+
+      <div class="section-heading">
+        <span class="section-icon">02</span>
+        <div>
+          <h2>لوحة المطور</h2>
+          <p>إدارة وتحكم في المنصة</p>
+        </div>
+      </div>
+
+      <form id="developerLogin">
+        <label for="adminPassword">رمز دخول المطور</label>
+
+        <input
+          type="password"
+          id="adminPassword"
+          placeholder="أدخل رمز الدخول"
+          autocomplete="current-password"
+          required
+        >
+
+        <button type="submit" class="main-button">
+          دخول لوحة المطور
+        </button>
+      </form>
+
+      <div id="developerDashboard" hidden>
+
+        <h3 class="dashboard-title">إدارة المنصة</h3>
+
+        <div class="admin-tools">
+
+          <form id="limitForm" class="admin-form">
+            <h3>حد التنصيب</h3>
+            <input type="number" id="newLimit"
+              placeholder="الحد الجديد" min="0" required>
+            <button type="submit">تحديث الحد</button>
+          </form>
+
+          <form id="banForm" class="admin-form">
+            <h3>حظر مستخدم</h3>
+            <input type="tel" id="banPhone"
+              placeholder="رقم المستخدم" required>
+            <button type="submit">حظر</button>
+          </form>
+
+          <form id="unbanForm" class="admin-form">
+            <h3>إلغاء الحظر</h3>
+            <input type="tel" id="unbanPhone"
+              placeholder="رقم المستخدم" required>
+            <button type="submit">إلغاء الحظر</button>
+          </form>
+
+          <form id="announcementForm" class="admin-form">
+            <h3>إرسال إعلان</h3>
+            <textarea id="announcement"
+              placeholder="اكتب الإعلان هنا" required></textarea>
+            <button type="submit">نشر الإعلان</button>
+          </form>
+
         </div>
 
-        <div class="stat-card">
-          <span>الاتصالات الناجحة</span>
-          <strong id="connectionsCount">0</strong>
-          <small>إجمالي الاتصالات</small>
-        </div>
-
-        <div class="stat-card">
-          <span>الاتصالات الفاشلة</span>
-          <strong id="failedCount">0</strong>
-          <small>محاولات فاشلة</small>
-        </div>
-
-        <div class="stat-card">
-          <span>حد التنصيب</span>
-          <strong id="limitCount">100</strong>
-          <small>الحد الأقصى</small>
-        </div>
+        <button type="button" id="developerLogout"
+          class="logout-button">
+          تسجيل الخروج
+        </button>
 
       </div>
 
-      <div class="admin-tools">
+    </section>
 
-        <div class="tool-heading">
-          <h3>إدارة المنصة</h3>
-          <p>أدوات التحكم الرئيسية</p>
-        </div>
+    <!-- الدعم -->
 
-        <form id="limitForm" class="admin-form">
-          <label for="newLimit">تعديل حد التنصيب</label>
-          <input
-            type="number"
-            id="newLimit"
-            min="1"
-            placeholder="الحد الجديد"
-            required
-          >
-          <button type="submit">حفظ الحد</button>
-        </form>
+    <section class="panel support-section" id="support">
+      <h2>الدعم والمساعدة</h2>
+      <p>تابع آخر أخبار وتحديثات RICO BOT.</p>
+      <a href="https://whatsapp.com/channel/0029VbE0UbjKwqSYg0WUxu42"
+         target="_blank" rel="noopener" class="main-button">
+        قناة RICO BOT
+      </a>
+    </section>
 
-        <form id="banForm" class="admin-form">
-          <label for="banPhone">حظر مستخدم</label>
-          <input
-            type="tel"
-            id="banPhone"
-            placeholder="رقم الهاتف مع رمز الدولة"
-            required
-          >
-          <button type="submit">حظر المستخدم</button>
-        </form>
+    <footer class="footer">
+      <h3>RICO BOT</h3>
+      <p>PREMIUM EDITION</p>
+      <p>POWERED BY RICO TEAM</p>
+    </footer>
 
-        <form id="unbanForm" class="admin-form">
-          <label for="unbanPhone">فك الحظر</label>
-          <input
-            type="tel"
-            id="unbanPhone"
-            placeholder="رقم الهاتف مع رمز الدولة"
-            required
-          >
-          <button type="submit">فك الحظر</button>
-        </form>
-
-        <form id="announcementForm" class="admin-form">
-          <label for="announcement">إرسال إعلان</label>
-          <textarea
-            id="announcement"
-            placeholder="اكتب الإعلان هنا"
-            required
-          ></textarea>
-          <button type="submit">حفظ الإعلان</button>
-        </form>
-
-      </div>
-
-      <button type="button" id="developerLogout" class="logout-button">
-        تسجيل الخروج
-      </button>
-
-    </div>
-
-  </section>
-
-</main>
-
-<footer>
-  <div class="footer-brand">RICO BOT</div>
-  <p>صُنع بإبداع واحترافية</p>
-  <small>© 2026 RICO BOT — جميع الحقوق محفوظة</small>
-</footer>
+  </main>
+</div>
 
 <script src="/script.js"></script>
+
+<script>
+  const menuToggle = document.getElementById("menuToggle");
+  const sidebar = document.getElementById("sidebar");
+
+  menuToggle.addEventListener("click", () => {
+    sidebar.classList.toggle("sidebar-open");
+  });
+
+  document.querySelectorAll(".nav-link").forEach(link => {
+    link.addEventListener("click", () => {
+      sidebar.classList.remove("sidebar-open");
+    });
+  });
+</script>
 
 </body>
 </html>
