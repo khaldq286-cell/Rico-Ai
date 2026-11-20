@@ -1,48 +1,24 @@
 
 "use strict";
 
-/* ==============================
-   RICO BOT - FRONTEND CONTROLLER
-============================== */
+// RICO BOT - Frontend Controller
 
 const $ = (id) => document.getElementById(id);
 
-const pairForm = $("pairForm");
-const resultBox = $("result");
-const pairCodeElement = $("pairCode");
-const messageElement = $("message");
-const pairButton = pairForm?.querySelector("button[type='submit']");
-
 let countdownInterval = null;
 
-/* ==============================
-   GENERAL HELPERS
-============================== */
-
-function showMessage(message, color = "#ffffff") {
-  if (!messageElement) return;
-
-  messageElement.textContent = message;
-  messageElement.style.color = color;
-}
-
+// إرسال الطلبات للسيرفر
 async function requestJSON(url, options = {}) {
   const response = await fetch(url, {
-    ...options,
     credentials: "same-origin",
+    ...options,
     headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...options.headers
+      "Content-Type": "application/json",
+      ...(options.headers || {})
     }
   });
 
-  let data;
-
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error("استجابة الخادم غير مفهومة");
-  }
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok || data.success === false) {
     throw new Error(data.message || "حدث خطأ أثناء تنفيذ الطلب");
@@ -51,375 +27,364 @@ async function requestJSON(url, options = {}) {
   return data;
 }
 
-function setButtonLoading(button, loading, text) {
+function showMessage(message, type = "success") {
+  const element = $("message");
+  if (!element) return;
+
+  element.textContent = message;
+  element.style.color =
+    type === "error" ? "#ff7777" : "#8aff75";
+}
+
+function setLoading(button, loading, text) {
   if (!button) return;
 
   if (loading) {
     button.dataset.originalText = button.textContent;
     button.disabled = true;
-    button.textContent = text;
+    button.textContent = text || "يرجى الانتظار...";
   } else {
     button.disabled = false;
     button.textContent =
-      button.dataset.originalText || text;
-    delete button.dataset.originalText;
+      button.dataset.originalText || text || "تنفيذ";
   }
 }
 
 function validPhone(phone) {
-  return /^\d{8,15}$/.test(phone);
+  return /^\d{7,15}$/.test(phone);
 }
 
-/* ==============================
-   PAIRING COUNTDOWN
-============================== */
+// تنصيب البوت
+const pairForm = $("pairForm");
 
-function startCountdown(seconds = 120) {
+if (pairForm) {
+  pairForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const button = $("pairButton");
+    const country = $("country").value.replace(/\D/g, "");
+    const phone = $("phone").value.replace(/\D/g, "")
+      .replace(/^0+/, "");
+
+    $("result").hidden = true;
+    showMessage("");
+
+    if (!validPhone(phone)) {
+      showMessage("تأكد من كتابة رقم الهاتف بصورة صحيحة", "error");
+      return;
+    }
+
+    setLoading(button, true, "جارٍ تنصيب البوت...");
+
+    try {
+      const data = await requestJSON("/api/pair", {
+        method: "POST",
+        body: JSON.stringify({
+          phone: country + phone
+        })
+      });
+
+      const code = data.code || data.pairingCode || data.pairCode;
+
+      if (!code) {
+        throw new Error("السيرفر لم يرجع رمز الاقتران");
+      }
+
+      $("pairCode").textContent = code;
+      $("result").hidden = false;
+
+      showMessage(data.message || "تم طلب رمز الاقتران بنجاح");
+
+      startCountdown(60);
+
+    } catch (error) {
+      showMessage(error.message, "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+}
+
+// عداد واجهة فقط، لا يؤكد صلاحية الرمز من واتساب
+function startCountdown(seconds) {
   clearInterval(countdownInterval);
 
+  const timer = $("timer");
+  if (!timer) return;
+
   let remaining = seconds;
-  const timerElement = $("timer");
 
-  if (!timerElement) return;
-
-  function updateTimer() {
+  function update() {
     const minutes = Math.floor(remaining / 60);
-    const secondsLeft = remaining % 60;
+    const secs = remaining % 60;
 
-    timerElement.textContent =
-      `${minutes}:${String(secondsLeft).padStart(2, "0")}`;
-  }
-
-  updateTimer();
-
-  countdownInterval = setInterval(() => {
-    remaining--;
-
-    updateTimer();
+    timer.textContent =
+      `وقت الانتظار: ${minutes}:${String(secs).padStart(2, "0")}`;
 
     if (remaining <= 0) {
       clearInterval(countdownInterval);
-      timerElement.textContent = "انتهى الوقت";
+      timer.textContent = "انتهى وقت الانتظار، اطلب رمزاً جديداً عند الحاجة";
+      return;
     }
-  }, 1000);
+
+    remaining--;
+  }
+
+  update();
+  countdownInterval = setInterval(update, 1000);
 }
 
-/* ==============================
-   WHATSAPP PAIRING
-============================== */
+// نسخ رمز الاقتران
+const copyButton = $("copyCode");
 
-pairForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
+if (copyButton) {
+  copyButton.addEventListener("click", async () => {
+    const code = $("pairCode").textContent.trim();
 
-  if (!pairButton) return;
+    if (!code) return;
 
-  const country = $("country")?.value || "";
-  const phoneInput = $("phone")?.value.trim() || "";
-
-  const localNumber = phoneInput.replace(/\D/g, "");
-
-  // إزالة صفر البداية عند إدخال رمز الدولة
-  const cleanedNumber = localNumber.replace(/^0+/, "");
-  const phone = country.replace(/\D/g, "") + cleanedNumber;
-
-  if (!validPhone(phone)) {
-    showMessage(
-      "تأكد من إدخال رقم الهاتف ورمز الدولة بصورة صحيحة",
-      "#ff7777"
-    );
-    return;
-  }
-
-  setButtonLoading(
-    pairButton,
-    true,
-    "جاري طلب كود الربط..."
-  );
-
-  resultBox && (resultBox.style.display = "none");
-
-  clearInterval(countdownInterval);
-
-  showMessage("يرجى الانتظار حتى يرد الخادم...", "#ffd447");
-
-  try {
-    const data = await requestJSON("/api/pair", {
-      method: "POST",
-      body: JSON.stringify({ phone })
-    });
-
-    if (!data.code) {
-      throw new Error("الخادم لم يرجع كود الربط");
+    try {
+      await navigator.clipboard.writeText(code);
+      copyButton.textContent = "تم النسخ";
+      setTimeout(() => {
+        copyButton.textContent = "نسخ الرمز";
+      }, 1800);
+    } catch {
+      showMessage("تعذر النسخ تلقائياً، انسخ الرمز يدوياً", "error");
     }
+  });
+}
 
-    if (pairCodeElement) {
-      pairCodeElement.textContent = data.code;
-    }
+// تسجيل دخول المطور
+const developerLogin = $("developerLogin");
 
-    if (resultBox) {
-      resultBox.style.display = "block";
-    }
+if (developerLogin) {
+  developerLogin.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
-    showMessage(
-      "تم استلام كود الربط من الخادم. أكمل الخطوات داخل واتساب.",
-      "#72ffc0"
-    );
+    const button = developerLogin.querySelector("button");
+    const password = $("adminPassword").value;
 
-    startCountdown(120);
+    setLoading(button, true, "جارٍ التحقق...");
 
-  } catch (error) {
-    showMessage(
-      error.message || "تعذر إنشاء كود الربط",
-      "#ff7777"
-    );
-  } finally {
-    setButtonLoading(
-      pairButton,
-      false,
-      "إنشاء كود الربط"
-    );
-  }
-});
+    try {
+      await requestJSON("/api/developer/login", {
+        method: "POST",
+        body: JSON.stringify({ password })
+      });
 
-/* ==============================
-   COPY PAIRING CODE
-============================== */
-
-$("copyCode")?.addEventListener("click", async () => {
-  const code = pairCodeElement?.textContent.trim();
-
-  if (!code) {
-    showMessage("لا يوجد كود لنسخه", "#ff7777");
-    return;
-  }
-
-  try {
-    await navigator.clipboard.writeText(code);
-
-    showMessage("تم نسخ كود الربط", "#72ffc0");
-
-  } catch {
-    showMessage(
-      "تعذر النسخ. حاول تحديد الكود ونسخه يدوياً.",
-      "#ff7777"
-    );
-  }
-});
-
-/* ==============================
-   DEVELOPER LOGIN
-============================== */
-
-$("developerLogin")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const form = event.currentTarget;
-  const button = form.querySelector("button[type='submit']");
-  const password = $("adminPassword")?.value || "";
-
-  if (!password.trim()) {
-    alert("أدخل رمز دخول المطور");
-    return;
-  }
-
-  setButtonLoading(button, true, "جاري التحقق...");
-
-  try {
-    await requestJSON("/api/developer/login", {
-      method: "POST",
-      body: JSON.stringify({ password })
-    });
-
-    if ($("developerDashboard")) {
+      $("adminPassword").value = "";
+      developerLogin.hidden = true;
       $("developerDashboard").hidden = false;
+
+      showMessage("تم تسجيل الدخول إلى لوحة المطور");
+
+      await loadStats();
+
+    } catch (error) {
+      showMessage(error.message, "error");
+    } finally {
+      setLoading(button, false);
     }
+  });
+}
 
-    form.hidden = true;
-
-    await loadStats();
-
-  } catch (error) {
-    alert(error.message || "فشل تسجيل الدخول");
-  } finally {
-    setButtonLoading(button, false, "تسجيل الدخول");
-  }
-});
-
-/* ==============================
-   DEVELOPER STATISTICS
-============================== */
-
+// إحصائيات المنصة
 async function loadStats() {
   try {
     const data = await requestJSON("/api/developer/stats");
 
-    if ($("usersCount")) {
-      $("usersCount").textContent = data.users ?? 0;
-    }
+    $("usersCount").textContent =
+      data.users ?? data.totalUsers ?? "--";
 
-    if ($("connectionsCount")) {
-      $("connectionsCount").textContent = data.connections ?? 0;
-    }
+    $("connectionsCount").textContent =
+      data.connections ?? data.totalConnections ?? "--";
 
-    if ($("failedCount")) {
-      $("failedCount").textContent = data.failed ?? 0;
-    }
+    $("failedCount").textContent =
+      data.failedConnections ?? "--";
 
-    if ($("limitCount")) {
-      $("limitCount").textContent = data.limit ?? 0;
-    }
+    $("limitCount").textContent =
+      data.installLimit ?? "--";
 
   } catch (error) {
-    console.error("RICO BOT Stats:", error.message);
+    console.error("Stats error:", error.message);
+  }
+}
 
-    if ($("developerDashboard")) {
+// تحديث حد التنصيب
+const limitForm = $("limitForm");
+
+if (limitForm) {
+  limitForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const button = limitForm.querySelector("button");
+    const limit = Number($("newLimit").value);
+
+    if (!Number.isInteger(limit) || limit < 0) {
+      showMessage("أدخل حداً صحيحاً", "error");
+      return;
+    }
+
+    setLoading(button, true, "جارٍ التحديث...");
+
+    try {
+      const data = await requestJSON("/api/developer/limit", {
+        method: "POST",
+        body: JSON.stringify({ limit })
+      });
+
+      showMessage(data.message || "تم تحديث الحد");
+      $("newLimit").value = "";
+
+      await loadStats();
+
+    } catch (error) {
+      showMessage(error.message, "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+}
+
+// حظر مستخدم
+const banForm = $("banForm");
+
+if (banForm) {
+  banForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const button = banForm.querySelector("button");
+    const phone = $("banPhone").value.replace(/\D/g, "");
+
+    if (!validPhone(phone)) {
+      showMessage("رقم المستخدم غير صحيح", "error");
+      return;
+    }
+
+    setLoading(button, true, "جارٍ الحظر...");
+
+    try {
+      const data = await requestJSON("/api/developer/ban", {
+        method: "POST",
+        body: JSON.stringify({ phone })
+      });
+
+      showMessage(data.message || "تم تنفيذ طلب الحظر");
+      $("banPhone").value = "";
+
+    } catch (error) {
+      showMessage(error.message, "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+}
+
+// إلغاء حظر مستخدم
+const unbanForm = $("unbanForm");
+
+if (unbanForm) {
+  unbanForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const button = unbanForm.querySelector("button");
+    const phone = $("unbanPhone").value.replace(/\D/g, "");
+
+    if (!validPhone(phone)) {
+      showMessage("رقم المستخدم غير صحيح", "error");
+      return;
+    }
+
+    setLoading(button, true, "جارٍ التنفيذ...");
+
+    try {
+      const data = await requestJSON("/api/developer/unban", {
+        method: "POST",
+        body: JSON.stringify({ phone })
+      });
+
+      showMessage(data.message || "تم تنفيذ طلب إلغاء الحظر");
+      $("unbanPhone").value = "";
+
+    } catch (error) {
+      showMessage(error.message, "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+}
+
+// إرسال إعلان
+const announcementForm = $("announcementForm");
+
+if (announcementForm) {
+  announcementForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const button = announcementForm.querySelector("button");
+    const announcement = $("announcement").value.trim();
+
+    if (!announcement) {
+      showMessage("اكتب نص الإعلان أولاً", "error");
+      return;
+    }
+
+    setLoading(button, true, "جارٍ الإرسال...");
+
+    try {
+      const data = await requestJSON("/api/developer/announce", {
+        method: "POST",
+        body: JSON.stringify({ announcement })
+      });
+
+      showMessage(data.message || "تم إرسال طلب حفظ الإعلان");
+      $("announcement").value = "";
+
+    } catch (error) {
+      showMessage(error.message, "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+}
+
+// تسجيل خروج المطور
+const logoutButton = $("developerLogout");
+
+if (logoutButton) {
+  logoutButton.addEventListener("click", async () => {
+    setLoading(logoutButton, true, "جارٍ الخروج...");
+
+    try {
+      await requestJSON("/api/developer/logout", {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+
       $("developerDashboard").hidden = true;
-    }
+      developerLogin.hidden = false;
 
-    if ($("developerLogin")) {
-      $("developerLogin").hidden = false;
+      showMessage("تم تسجيل الخروج");
+
+    } catch (error) {
+      showMessage(error.message, "error");
+    } finally {
+      setLoading(logoutButton, false);
     }
-  }
+  });
 }
 
-/* ==============================
-   CHANGE INSTALLATION LIMIT
-============================== */
-
-$("limitForm")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const form = event.currentTarget;
-  const button = form.querySelector("button[type='submit']");
-  const limit = Number($("newLimit")?.value);
-
-  if (!Number.isSafeInteger(limit) || limit < 1) {
-    alert("أدخل حداً صحيحاً أكبر من صفر");
-    return;
-  }
-
-  setButtonLoading(button, true, "جاري التحديث...");
-
-  try {
-    await requestJSON("/api/developer/limit", {
-      method: "POST",
-      body: JSON.stringify({ limit })
+// تفعيل روابط القائمة
+document.querySelectorAll(".nav-link").forEach((link) => {
+  link.addEventListener("click", () => {
+    document.querySelectorAll(".nav-link").forEach((item) => {
+      item.classList.remove("active");
     });
 
-    alert("تم تحديث حد التنصيب");
-    await loadStats();
-
-  } catch (error) {
-    alert(error.message);
-  } finally {
-    setButtonLoading(button, false, "تحديث الحد");
-  }
+    link.classList.add("active");
+  });
 });
 
-/* ==============================
-   BAN / UNBAN
-============================== */
+console.log("RICO BOT Frontend Loaded");
 
-$("banForm")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const phone = $("banPhone")?.value.trim() || "";
-
-  if (!validPhone(phone.replace(/\D/g, ""))) {
-    alert("أدخل رقم هاتف صحيحاً مع رمز الدولة");
-    return;
-  }
-
-  await adminAction(
-    event.currentTarget,
-    "/api/developer/ban",
-    { phone: phone.replace(/\D/g, "") },
-    "تم حظر الرقم"
-  );
-});
-
-$("unbanForm")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const phone = $("unbanPhone")?.value.trim() || "";
-
-  if (!validPhone(phone.replace(/\D/g, ""))) {
-    alert("أدخل رقم هاتف صحيحاً مع رمز الدولة");
-    return;
-  }
-
-  await adminAction(
-    event.currentTarget,
-    "/api/developer/unban",
-    { phone: phone.replace(/\D/g, "") },
-    "تم فك الحظر"
-  );
-});
-
-/* ==============================
-   ANNOUNCEMENTS
-============================== */
-
-$("announcementForm")?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const message = $("announcement")?.value.trim() || "";
-
-  if (!message) {
-    alert("اكتب نص الإعلان أولاً");
-    return;
-  }
-
-  await adminAction(
-    event.currentTarget,
-    "/api/developer/announce",
-    { message },
-    "تم حفظ الإعلان"
-  );
-});
-
-/* ==============================
-   ADMIN ACTION HELPER
-============================== */
-
-async function adminAction(form, url, body, successMessage) {
-  const button = form.querySelector("button[type='submit']");
-
-  setButtonLoading(button, true, "جاري التنفيذ...");
-
-  try {
-    await requestJSON(url, {
-      method: "POST",
-      body: JSON.stringify(body)
-    });
-
-    alert(successMessage);
-
-    await loadStats();
-
-  } catch (error) {
-    alert(error.message || "تعذر تنفيذ العملية");
-  } finally {
-    setButtonLoading(button, false, "تنفيذ");
-  }
-}
-
-/* ==============================
-   DEVELOPER LOGOUT
-============================== */
-
-$("developerLogout")?.addEventListener("click", async () => {
-  try {
-    await requestJSON("/api/developer/logout", {
-      method: "POST"
-    });
-  } catch (error) {
-    console.error("Logout error:", error.message);
-  }
-
-  location.reload();
-});
-
-/* ==============================
-   END RICO BOT CONTROLLER
-============================== */
