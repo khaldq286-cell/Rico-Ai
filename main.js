@@ -1,10 +1,13 @@
+
 require("dotenv").config();
 
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const pino = require("pino");
+
+const connectWhatsApp = require("./connect");
+const { createSocket } = require("./Socket");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,10 +33,6 @@ if (!ADMIN_CODE) {
 const sessions = new Map();
 const adminTokens = new Map();
 
-let makeWASocket;
-let useMultiFileAuthState;
-let DisconnectReason;
-
 let db = {
   installLimit: Number(process.env.INSTALL_LIMIT || 100),
   bannedUsers: [],
@@ -41,6 +40,8 @@ let db = {
   failedConnections: 0,
   announcements: []
 };
+
+// DATABASE
 
 function loadDatabase() {
   try {
@@ -54,12 +55,18 @@ function loadDatabase() {
 }
 
 function saveDatabase() {
-  const temp = DB_FILE + ".tmp";
-  fs.writeFileSync(temp, JSON.stringify(db, null, 2));
-  fs.renameSync(temp, DB_FILE);
+  try {
+    const temp = DB_FILE + ".tmp";
+    fs.writeFileSync(temp, JSON.stringify(db, null, 2));
+    fs.renameSync(temp, DB_FILE);
+  } catch (error) {
+    console.error("DATABASE SAVE ERROR:", error.message);
+  }
 }
 
 loadDatabase();
+
+// HELPERS
 
 function cleanPhone(value) {
   return String(value || "").replace(/\D/g, "");
@@ -91,26 +98,10 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// SOCKET EVENTS
 
-async function createWhatsAppSocket(phone, authPath, session) {
-  const { state, saveCreds } =
-    await useMultiFileAuthState(authPath);
-
-  session.state = state;
-  session.saveCreds = saveCreds;
-
-  const sock = makeWASocket({
-    auth: state,
-    logger: pino({ level: "silent" }),
-    browser: ["RICO BOT", "Chrome", "1.0.0"]
-  });
-
-  session.sock = sock;
-
-  sock.ev.on("creds.update", saveCreds);
+function attachSocketEvents(phone, session, authPath) {
+  const sock = session.sock;
 
   sock.ev.on("connection.update", async update => {
     const { connection, lastDisconnect } = update;
@@ -123,14 +114,17 @@ async function createWhatsAppSocket(phone, authPath, session) {
 
       session.status = "connected";
       session.retryCount = 0;
+
+      console.log("RICO CONNECTED:", phone);
     }
 
     if (connection === "close") {
       session.status = "disconnected";
 
-      const code = lastDisconnect?.error?.output?.statusCode;
+      const code =
+        lastDisconnect?.error?.output?.statusCode;
 
-      if (code === DisconnectReason.loggedOut) {
+      if (code === session.DisconnectReason?.loggedOut) {
         sessions.delete(phone);
         return;
       }
@@ -140,7 +134,10 @@ async function createWhatsAppSocket(phone, authPath, session) {
 
       session.retryCount++;
 
-      if (session.retryCount > 5) return;
+      if (session.retryCount > 5) {
+        console.log("RECONNECT LIMIT:", phone);
+        return;
+      }
 
       session.reconnectTimer = setTimeout(async () => {
         session.reconnectTimer = null;
@@ -149,7 +146,15 @@ async function createWhatsAppSocket(phone, authPath, session) {
 
         try {
           session.status = "connecting";
-          await createWhatsAppSocket(phone, authPath, session);
+
+          const result = await createSocket(authPath);
+
+          session.sock = result.sock;
+          session.state = result.state;
+          session.DisconnectReason = result.DisconnectReason;
+
+          attachSocketEvents(phone, session, authPath);
+
         } catch (error) {
           console.error("RECONNECT ERROR:", error.message);
           session.status = "disconnected";
@@ -157,13 +162,15 @@ async function createWhatsAppSocket(phone, authPath, session) {
       }, Math.min(3000 * session.retryCount, 15000));
     }
   });
-
-  return sock;
 }
+
+// HOME
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
+// WHATSAPP PAIRING
 
 app.post("/api/pair", async (req, res) => {
   const phone = cleanPhone(req.body.phone);
@@ -199,43 +206,29 @@ app.post("/api/pair", async (req, res) => {
   const authPath = path.join(SESSION_DIR, phone);
 
   const session = {
+    sock: null,
+    state: null,
     status: "connecting",
     retryCount: 0,
     reconnectTimer: null,
+    DisconnectReason: null,
     createdAt: Date.now()
   };
 
   sessions.set(phone, session);
 
   try {
-    const auth = await useMultiFileAuthState(authPath);
+    const result = await connectWhatsApp(phone, SESSION_DIR);
 
-    if (auth.state.creds.registered) {
-      sessions.delete(phone);
+    session.sock = result.sock;
+    session.state = result.state;
+    session.DisconnectReason = result.DisconnectReason;
 
-      return res.status(409).json({
-        success: false,
-        message: "هذا الرقم مرتبط مسبقاً"
-      });
-    }
-
-    const sock = await createWhatsAppSocket(
-      phone,
-      authPath,
-      session
-    );
-
-    await wait(3000);
-
-    if (auth.state.creds.registered) {
-      throw new Error("هذا الرقم مرتبط مسبقاً");
-    }
-
-    const code = await sock.requestPairingCode(phone);
+    attachSocketEvents(phone, session, authPath);
 
     return res.json({
       success: true,
-      code,
+      code: result.code,
       message: "أدخل كود الربط في واتساب"
     });
 
@@ -251,12 +244,21 @@ app.post("/api/pair", async (req, res) => {
 
     sessions.delete(phone);
 
+    if (session.sock) {
+      try {
+        session.sock.end(undefined);
+      } catch {}
+    }
+
     return res.status(500).json({
       success: false,
-      message: "تعذر طلب كود الاقتران"
+      message: "تعذر طلب كود الاقتران",
+      error: error.message
     });
   }
 });
+
+// PAIR STATUS
 
 app.get("/api/pair/status", (req, res) => {
   const phone = cleanPhone(req.query.phone);
@@ -266,6 +268,8 @@ app.get("/api/pair/status", (req, res) => {
     status: session ? session.status : "not_found"
   });
 });
+
+// DEVELOPER LOGIN
 
 app.post("/api/developer/login", (req, res) => {
   const password = String(req.body.password || "");
@@ -287,18 +291,25 @@ app.post("/api/developer/login", (req, res) => {
   }
 
   const token = crypto.randomBytes(32).toString("hex");
-  adminTokens.set(token, Date.now() + 8 * 60 * 60 * 1000);
+
+  adminTokens.set(
+    token,
+    Date.now() + 8 * 60 * 60 * 1000
+  );
 
   const secure =
-    req.secure || req.headers["x-forwarded-proto"] === "https";
+    req.secure ||
+    req.headers["x-forwarded-proto"] === "https";
 
   res.setHeader(
     "Set-Cookie",
     `rico_admin=${token}; HttpOnly; ${secure ? "Secure;" : ""} SameSite=Lax; Path=/; Max-Age=28800`
   );
 
-  res.json({ success: true, message: "تم تسجيل الدخول" });
+  res.json({ success: true });
 });
+
+// DEVELOPER LOGOUT
 
 app.post("/api/developer/logout", requireAdmin, (req, res) => {
   const token = getToken(req);
@@ -312,6 +323,8 @@ app.post("/api/developer/logout", requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// STATS
+
 app.get("/api/developer/stats", requireAdmin, (req, res) => {
   res.json({
     users: sessions.size,
@@ -321,6 +334,8 @@ app.get("/api/developer/stats", requireAdmin, (req, res) => {
     banned: db.bannedUsers.length
   });
 });
+
+// INSTALL LIMIT
 
 app.post("/api/developer/limit", requireAdmin, (req, res) => {
   const limit = Number(req.body.limit);
@@ -337,6 +352,8 @@ app.post("/api/developer/limit", requireAdmin, (req, res) => {
 
   res.json({ success: true, limit });
 });
+
+// BAN
 
 app.post("/api/developer/ban", requireAdmin, (req, res) => {
   const phone = cleanPhone(req.body.phone);
@@ -356,6 +373,8 @@ app.post("/api/developer/ban", requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// UNBAN
+
 app.post("/api/developer/unban", requireAdmin, (req, res) => {
   const phone = cleanPhone(req.body.phone);
 
@@ -364,6 +383,8 @@ app.post("/api/developer/unban", requireAdmin, (req, res) => {
 
   res.json({ success: true });
 });
+
+// ANNOUNCEMENTS
 
 app.post("/api/developer/announce", requireAdmin, (req, res) => {
   const message = String(
@@ -388,6 +409,8 @@ app.post("/api/developer/announce", requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// HEALTH
+
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
@@ -395,6 +418,8 @@ app.get("/api/health", (req, res) => {
     status: "running"
   });
 });
+
+// ERROR HANDLER
 
 app.use((error, req, res, next) => {
   console.error("SERVER ERROR:", error.message);
@@ -405,26 +430,8 @@ app.use((error, req, res, next) => {
   });
 });
 
-async function startServer() {
-  try {
-    const baileys = await import("@whiskeysockets/baileys");
+// START
 
-    makeWASocket = baileys.default;
-    useMultiFileAuthState = baileys.useMultiFileAuthState;
-    DisconnectReason = baileys.DisconnectReason;
-
-    if (!makeWASocket || !useMultiFileAuthState) {
-      throw new Error("تعذر تحميل Baileys");
-    }
-
-    app.listen(PORT, () => {
-      console.log("RICO BOT SERVER STARTED:", PORT);
-    });
-
-  } catch (error) {
-    console.error("STARTUP ERROR:", error);
-    process.exit(1);
-  }
-}
-
-startServer();
+app.listen(PORT, () => {
+  console.log("RICO BOT SERVER STARTED:", PORT);
+});
