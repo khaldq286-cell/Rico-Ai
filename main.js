@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -10,13 +9,6 @@ const pino = require("pino");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==============================
-// RICO BOT SETTINGS
-// ==============================
-
-const ADMIN_ACTIVATION_CODE =
-  process.env.RICO_ADMIN_ACTIVATION_CODE || "RICO-ADMIN-2010";
-
 const DATA_DIR = path.join(__dirname, "database");
 const SESSION_DIR = path.join(__dirname, "sessions");
 const DB_FILE = path.join(DATA_DIR, "database.json");
@@ -27,6 +19,13 @@ fs.mkdirSync(SESSION_DIR, { recursive: true });
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
+
+const ADMIN_CODE = process.env.RICO_ADMIN_ACTIVATION_CODE;
+
+if (!ADMIN_CODE) {
+  console.error("RICO_ADMIN_ACTIVATION_CODE is missing");
+  process.exit(1);
+}
 
 const sessions = new Map();
 const adminTokens = new Map();
@@ -43,45 +42,24 @@ let db = {
   announcements: []
 };
 
-// ==============================
-// DATABASE
-// ==============================
-
 function loadDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
-      const saved = JSON.parse(
-        fs.readFileSync(DB_FILE, "utf8")
-      );
-
+      const saved = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
       db = { ...db, ...saved };
     }
   } catch (error) {
-    console.error("DATABASE LOAD ERROR:", error.message);
+    console.error("DATABASE ERROR:", error.message);
   }
 }
 
 function saveDatabase() {
-  try {
-    const tempFile = DB_FILE + ".tmp";
-
-    fs.writeFileSync(
-      tempFile,
-      JSON.stringify(db, null, 2),
-      "utf8"
-    );
-
-    fs.renameSync(tempFile, DB_FILE);
-  } catch (error) {
-    console.error("DATABASE SAVE ERROR:", error.message);
-  }
+  const temp = DB_FILE + ".tmp";
+  fs.writeFileSync(temp, JSON.stringify(db, null, 2));
+  fs.renameSync(temp, DB_FILE);
 }
 
 loadDatabase();
-
-// ==============================
-// GENERAL HELPERS
-// ==============================
 
 function cleanPhone(value) {
   return String(value || "").replace(/\D/g, "");
@@ -94,20 +72,19 @@ function validPhone(phone) {
 function getToken(req) {
   const cookie = req.headers.cookie || "";
   const match = cookie.match(/(?:^|;\s*)rico_admin=([^;]+)/);
-
   return match ? match[1] : null;
 }
 
 function requireAdmin(req, res, next) {
   const token = getToken(req);
-  const expiresAt = token ? adminTokens.get(token) : null;
+  const expires = token ? adminTokens.get(token) : null;
 
-  if (!token || !expiresAt || expiresAt < Date.now()) {
+  if (!expires || expires < Date.now()) {
     if (token) adminTokens.delete(token);
 
     return res.status(401).json({
       success: false,
-      message: "انتهت جلسة المطور، سجل الدخول من جديد"
+      message: "سجل دخول المطور من جديد"
     });
   }
 
@@ -118,20 +95,9 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ==============================
-// WHATSAPP CONNECTION
-// ==============================
-
-async function createWhatsAppSocket(
-  phone,
-  authPath,
-  session,
-  authState = null
-) {
-  const auth = authState ||
+async function createWhatsAppSocket(phone, authPath, session) {
+  const { state, saveCreds } =
     await useMultiFileAuthState(authPath);
-
-  const { state, saveCreds } = auth;
 
   session.state = state;
   session.saveCreds = saveCreds;
@@ -150,92 +116,54 @@ async function createWhatsAppSocket(
     const { connection, lastDisconnect } = update;
 
     if (connection === "open") {
-      const wasConnected = session.status === "connected";
-
-      session.status = "connected";
-      session.retryCount = 0;
-
-      if (!wasConnected) {
+      if (session.status !== "connected") {
         db.totalConnections++;
         saveDatabase();
       }
 
-      console.log("WHATSAPP CONNECTED:", phone);
+      session.status = "connected";
+      session.retryCount = 0;
     }
 
     if (connection === "close") {
-      const statusCode =
-        lastDisconnect?.error?.output?.statusCode;
-
-      console.log(
-        "WHATSAPP DISCONNECTED:",
-        phone,
-        statusCode
-      );
-
       session.status = "disconnected";
 
-      if (statusCode === DisconnectReason.loggedOut) {
+      const code = lastDisconnect?.error?.output?.statusCode;
+
+      if (code === DisconnectReason.loggedOut) {
         sessions.delete(phone);
-        console.log("WHATSAPP LOGGED OUT:", phone);
         return;
       }
 
-      if (
-        sessions.get(phone) === session &&
-        !session.reconnectTimer
-      ) {
-        session.retryCount =
-          (session.retryCount || 0) + 1;
+      if (sessions.get(phone) !== session) return;
+      if (session.reconnectTimer) return;
 
-        if (session.retryCount > 5) {
-          console.error("RECONNECT LIMIT REACHED:", phone);
-          return;
+      session.retryCount++;
+
+      if (session.retryCount > 5) return;
+
+      session.reconnectTimer = setTimeout(async () => {
+        session.reconnectTimer = null;
+
+        if (sessions.get(phone) !== session) return;
+
+        try {
+          session.status = "connecting";
+          await createWhatsAppSocket(phone, authPath, session);
+        } catch (error) {
+          console.error("RECONNECT ERROR:", error.message);
+          session.status = "disconnected";
         }
-
-        const delay =
-          statusCode === DisconnectReason.restartRequired
-            ? 1500
-            : Math.min(3000 * session.retryCount, 15000);
-
-        session.reconnectTimer = setTimeout(async () => {
-          session.reconnectTimer = null;
-
-          if (sessions.get(phone) !== session) return;
-
-          try {
-            session.status = "connecting";
-
-            await createWhatsAppSocket(
-              phone,
-              authPath,
-              session
-            );
-          } catch (error) {
-            console.error("RECONNECT ERROR:", error.message);
-            session.status = "disconnected";
-          }
-        }, delay);
-      }
+      }, Math.min(3000 * session.retryCount, 15000));
     }
   });
 
   return sock;
 }
 
-// ==============================
-// HOME PAGE
-// ==============================
-
 app.get("/", (req, res) => {
-  res.sendFile(
-    path.join(__dirname, "public", "index.html")
-  );
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
-
-// ==============================
-// PAIR WHATSAPP
-// ==============================
 
 app.post("/api/pair", async (req, res) => {
   const phone = cleanPhone(req.body.phone);
@@ -271,23 +199,18 @@ app.post("/api/pair", async (req, res) => {
   const authPath = path.join(SESSION_DIR, phone);
 
   const session = {
-    sock: null,
     status: "connecting",
-    createdAt: Date.now(),
     retryCount: 0,
-    reconnectTimer: null
+    reconnectTimer: null,
+    createdAt: Date.now()
   };
 
   sessions.set(phone, session);
 
-  let sock;
-  let timeout;
-
   try {
-    const authState =
-      await useMultiFileAuthState(authPath);
+    const auth = await useMultiFileAuthState(authPath);
 
-    if (authState.state.creds.registered) {
+    if (auth.state.creds.registered) {
       sessions.delete(phone);
 
       return res.status(409).json({
@@ -296,34 +219,19 @@ app.post("/api/pair", async (req, res) => {
       });
     }
 
-    sock = await createWhatsAppSocket(
+    const sock = await createWhatsAppSocket(
       phone,
       authPath,
-      session,
-      authState
+      session
     );
 
-    // منح الاتصال وقتاً للتهيئة
-    await wait(1500);
+    await wait(3000);
 
-    if (authState.state.creds.registered) {
+    if (auth.state.creds.registered) {
       throw new Error("هذا الرقم مرتبط مسبقاً");
     }
 
-    const pairingPromise = sock.requestPairingCode(phone);
-
-    const code = await Promise.race([
-      pairingPromise,
-      new Promise((resolve, reject) => {
-        timeout = setTimeout(() => {
-          reject(
-            new Error("انتهت مهلة طلب كود الاقتران")
-          );
-        }, 45000);
-      })
-    ]);
-
-    clearTimeout(timeout);
+    const code = await sock.requestPairingCode(phone);
 
     return res.json({
       success: true,
@@ -332,9 +240,7 @@ app.post("/api/pair", async (req, res) => {
     });
 
   } catch (error) {
-    clearTimeout(timeout);
-
-    console.error("PAIR ERROR:", error);
+    console.error("PAIR ERROR:", error.message);
 
     db.failedConnections++;
     saveDatabase();
@@ -345,23 +251,12 @@ app.post("/api/pair", async (req, res) => {
 
     sessions.delete(phone);
 
-    if (sock) {
-      try {
-        sock.end(undefined);
-      } catch {}
-    }
-
     return res.status(500).json({
       success: false,
-      message: "تعذر طلب كود الاقتران",
-      error: error.message
+      message: "تعذر طلب كود الاقتران"
     });
   }
 });
-
-// ==============================
-// PAIR STATUS
-// ==============================
 
 app.get("/api/pair/status", (req, res) => {
   const phone = cleanPhone(req.query.phone);
@@ -372,35 +267,19 @@ app.get("/api/pair/status", (req, res) => {
   });
 });
 
-// ==============================
-// DEVELOPER LOGIN
-// ==============================
-
 app.post("/api/developer/login", (req, res) => {
   const password = String(req.body.password || "");
 
-  if (!password) {
-    return res.status(400).json({
-      success: false,
-      message: "أدخل كود تفعيل لوحة المطور"
-    });
-  }
+  const inputHash = crypto.createHash("sha256")
+    .update(password).digest();
 
-  const validCode =
-    crypto.timingSafeEqual(
-      Buffer.from(
-        crypto.createHash("sha256")
-          .update(password)
-          .digest("hex")
-      ),
-      Buffer.from(
-        crypto.createHash("sha256")
-          .update(ADMIN_ACTIVATION_CODE)
-          .digest("hex")
-      )
-    );
+  const adminHash = crypto.createHash("sha256")
+    .update(ADMIN_CODE).digest();
 
-  if (!validCode) {
+  if (
+    !password ||
+    !crypto.timingSafeEqual(inputHash, adminHash)
+  ) {
     return res.status(401).json({
       success: false,
       message: "كود التفعيل غير صحيح"
@@ -408,169 +287,106 @@ app.post("/api/developer/login", (req, res) => {
   }
 
   const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+  adminTokens.set(token, Date.now() + 8 * 60 * 60 * 1000);
 
-  adminTokens.set(token, expiresAt);
-
-  const secure = req.secure ||
-    req.headers["x-forwarded-proto"] === "https";
+  const secure =
+    req.secure || req.headers["x-forwarded-proto"] === "https";
 
   res.setHeader(
     "Set-Cookie",
     `rico_admin=${token}; HttpOnly; ${secure ? "Secure;" : ""} SameSite=Lax; Path=/; Max-Age=28800`
   );
 
+  res.json({ success: true, message: "تم تسجيل الدخول" });
+});
+
+app.post("/api/developer/logout", requireAdmin, (req, res) => {
+  const token = getToken(req);
+  adminTokens.delete(token);
+
+  res.setHeader(
+    "Set-Cookie",
+    "rico_admin=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
+  );
+
+  res.json({ success: true });
+});
+
+app.get("/api/developer/stats", requireAdmin, (req, res) => {
   res.json({
-    success: true,
-    message: "تم تسجيل الدخول"
+    users: sessions.size,
+    connections: db.totalConnections,
+    failed: db.failedConnections,
+    limit: db.installLimit,
+    banned: db.bannedUsers.length
   });
 });
 
-// ==============================
-// DEVELOPER LOGOUT
-// ==============================
+app.post("/api/developer/limit", requireAdmin, (req, res) => {
+  const limit = Number(req.body.limit);
 
-app.post(
-  "/api/developer/logout",
-  requireAdmin,
-  (req, res) => {
-    const token = getToken(req);
-
-    if (token) adminTokens.delete(token);
-
-    res.setHeader(
-      "Set-Cookie",
-      "rico_admin=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
-    );
-
-    res.json({ success: true });
-  }
-);
-
-// ==============================
-// DEVELOPER STATS
-// ==============================
-
-app.get(
-  "/api/developer/stats",
-  requireAdmin,
-  (req, res) => {
-    res.json({
-      users: sessions.size,
-      connections: db.totalConnections,
-      failed: db.failedConnections,
-      limit: db.installLimit,
-      banned: db.bannedUsers.length
+  if (!Number.isInteger(limit) || limit < 1) {
+    return res.status(400).json({
+      success: false,
+      message: "الحد غير صحيح"
     });
   }
-);
 
-// ==============================
-// CHANGE INSTALL LIMIT
-// ==============================
+  db.installLimit = limit;
+  saveDatabase();
 
-app.post(
-  "/api/developer/limit",
-  requireAdmin,
-  (req, res) => {
-    const limit = Number(req.body.limit);
+  res.json({ success: true, limit });
+});
 
-    if (!Number.isInteger(limit) || limit < 1) {
-      return res.status(400).json({
-        success: false,
-        message: "الحد غير صحيح"
-      });
-    }
+app.post("/api/developer/ban", requireAdmin, (req, res) => {
+  const phone = cleanPhone(req.body.phone);
 
-    db.installLimit = limit;
-    saveDatabase();
-
-    res.json({
-      success: true,
-      limit
+  if (!validPhone(phone)) {
+    return res.status(400).json({
+      success: false,
+      message: "رقم الهاتف غير صحيح"
     });
   }
-);
 
-// ==============================
-// BAN USER
-// ==============================
-
-app.post(
-  "/api/developer/ban",
-  requireAdmin,
-  (req, res) => {
-    const phone = cleanPhone(req.body.phone);
-
-    if (!validPhone(phone)) {
-      return res.status(400).json({
-        success: false,
-        message: "رقم الهاتف غير صحيح"
-      });
-    }
-
-    if (!db.bannedUsers.includes(phone)) {
-      db.bannedUsers.push(phone);
-      saveDatabase();
-    }
-
-    res.json({ success: true });
-  }
-);
-
-// ==============================
-// UNBAN USER
-// ==============================
-
-app.post(
-  "/api/developer/unban",
-  requireAdmin,
-  (req, res) => {
-    const phone = cleanPhone(req.body.phone);
-
-    db.bannedUsers =
-      db.bannedUsers.filter(number => number !== phone);
-
+  if (!db.bannedUsers.includes(phone)) {
+    db.bannedUsers.push(phone);
     saveDatabase();
-
-    res.json({ success: true });
   }
-);
 
-// ==============================
-// ANNOUNCEMENTS
-// ==============================
+  res.json({ success: true });
+});
 
-app.post(
-  "/api/developer/announce",
-  requireAdmin,
-  (req, res) => {
-    const message = String(
-      req.body.message || ""
-    ).trim();
+app.post("/api/developer/unban", requireAdmin, (req, res) => {
+  const phone = cleanPhone(req.body.phone);
 
-    if (!message) {
-      return res.status(400).json({
-        success: false,
-        message: "الإعلان فارغ"
-      });
-    }
+  db.bannedUsers = db.bannedUsers.filter(x => x !== phone);
+  saveDatabase();
 
-    db.announcements.push({
-      id: crypto.randomUUID(),
-      message,
-      date: new Date().toISOString()
+  res.json({ success: true });
+});
+
+app.post("/api/developer/announce", requireAdmin, (req, res) => {
+  const message = String(
+    req.body.announcement || req.body.message || ""
+  ).trim();
+
+  if (!message) {
+    return res.status(400).json({
+      success: false,
+      message: "الإعلان فارغ"
     });
-
-    saveDatabase();
-
-    res.json({ success: true });
   }
-);
 
-// ==============================
-// HEALTH CHECK
-// ==============================
+  db.announcements.push({
+    id: crypto.randomUUID(),
+    message,
+    date: new Date().toISOString()
+  });
+
+  saveDatabase();
+
+  res.json({ success: true });
+});
 
 app.get("/api/health", (req, res) => {
   res.json({
@@ -580,12 +396,8 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ==============================
-// ERROR HANDLER
-// ==============================
-
 app.use((error, req, res, next) => {
-  console.error("SERVER ERROR:", error);
+  console.error("SERVER ERROR:", error.message);
 
   res.status(500).json({
     success: false,
@@ -593,36 +405,20 @@ app.use((error, req, res, next) => {
   });
 });
 
-// ==============================
-// START SERVER
-// ==============================
-
 async function startServer() {
   try {
-    const baileys =
-      await import("@whiskeysockets/baileys");
+    const baileys = await import("@whiskeysockets/baileys");
 
     makeWASocket = baileys.default;
-    useMultiFileAuthState =
-      baileys.useMultiFileAuthState;
+    useMultiFileAuthState = baileys.useMultiFileAuthState;
     DisconnectReason = baileys.DisconnectReason;
 
-    if (
-      !makeWASocket ||
-      !useMultiFileAuthState ||
-      !DisconnectReason
-    ) {
-      throw new Error(
-        "تعذر تحميل وظائف Baileys المطلوبة"
-      );
+    if (!makeWASocket || !useMultiFileAuthState) {
+      throw new Error("تعذر تحميل Baileys");
     }
 
     app.listen(PORT, () => {
-      console.log("==============================");
-      console.log("          RICO BOT");
-      console.log("       SERVER STARTED");
-      console.log("       PORT:", PORT);
-      console.log("==============================");
+      console.log("RICO BOT SERVER STARTED:", PORT);
     });
 
   } catch (error) {
