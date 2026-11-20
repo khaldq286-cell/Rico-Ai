@@ -1,14 +1,12 @@
 const path = require("path");
 const { createSocket } = require("./Socket");
 
-async function connectWhatsApp(phone, sessionDir) {
-  const authPath = path.join(sessionDir, phone);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const {
-    sock,
-    state,
-    DisconnectReason
-  } = await createSocket(authPath);
+// يطلب رمز اقتران حقيقي من واتساب للرقم (بصيغة دولية بدون +)
+async function connectWhatsApp(phone, sessionDir) {
+  const { sock, state, DisconnectReason } =
+    await createSocket(path.join(sessionDir, phone));
 
   if (state.creds.registered) {
     sock.end(undefined);
@@ -16,17 +14,10 @@ async function connectWhatsApp(phone, sessionDir) {
   }
 
   try {
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    const code = await sock.requestPairingCode(phone);
-    console.log("PAIRING CODE:", code);
-
-    return {
-      code,
-      sock,
-      state,
-      DisconnectReason
-    };
+    await wait(3000); // انتظار جاهزية الاتصال قبل طلب الرمز
+    const raw = await sock.requestPairingCode(phone);
+    const code = raw.match(/.{1,4}/g).join("-");
+    return { code, sock, state, DisconnectReason };
   } catch (error) {
     sock.end(undefined);
     throw error;
