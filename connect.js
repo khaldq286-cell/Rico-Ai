@@ -1,8 +1,6 @@
 const path = require("path");
 const { createSocket } = require("./Socket");
 
-const CUSTOM_PAIRING_CODE = "RICO2010";
-
 async function connectWhatsApp(phone, sessionDir) {
   const authPath = path.join(sessionDir, phone);
 
@@ -20,10 +18,8 @@ async function connectWhatsApp(phone, sessionDir) {
   try {
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const code = await sock.requestPairingCode(
-      phone,
-      CUSTOM_PAIRING_CODE
-    );
+    const code = await sock.requestPairingCode(phone);
+    console.log("PAIRING CODE:", code);
 
     return {
       code,
