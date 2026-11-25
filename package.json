@@ -3,9 +3,9 @@
   "version": "2.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "main.js",
+  "main": "Server.js",
   "scripts": {
-    "start": "node main.js"
+    "start": "node Server.js"
   },
   "engines": {
     "node": ">=20"
