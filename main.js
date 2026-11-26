@@ -304,6 +304,16 @@ app.get("/api/public", (req, res) => {
   res.json({ maintenance: db.maintenance });
 });
 
+// إحصائيات عامة للصفحة الرئيسية (بدون بيانات حساسة)
+app.get("/api/stats", (req, res) => {
+  res.json({
+    users: sessions.size,
+    connections: db.totalConnections,
+    failed: db.failedConnections,
+    limit: db.installLimit + db.installAdjust
+  });
+});
+
 // ================= PAIRING =================
 
 app.post("/api/pair", async (req, res) => {
