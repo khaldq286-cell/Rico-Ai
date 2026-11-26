@@ -1,205 +1,109 @@
+// قائمة أوامر RICO BOT
 const MENU_IMG = "https://raw.githubusercontent.com/MohamedVex/Lora-Upload1/main/uploads/1794253862863.jpg";
+const BOT_NAME = "RICO BOT";
+const TRIGGERS = [".menu", ".اوامر", ".قائمة"];
 
-const handler = async (m, { conn, args, command, cli }) => {
-  const senderNum = m.sender.split("@")[0].split(":")[0];
-  const status = {
-    key: {
-      participant: `${senderNum}@s.whatsapp.net`,
-      remoteJid: "status@broadcast",
-      fromMe: false,
-    },
-    message: {
-      contactMessage: {
-        displayName: `${m.pushName || "User"}`,
-        vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${m.pushName || "User"}\nitem1.TEL;waid=${senderNum}:${senderNum}\nEND:VCARD`,
-      },
-    },
-    participant: "0@s.whatsapp.net",
-  };
+const CATEGORIES = [
+  { n: 1, name: "التـحـمـيـل", key: "downloads", icon: "📂" },
+  { n: 2, name: "الـمـجـمـوعـات", key: "groups", icon: "🐞" },
+  { n: 3, name: "الـمـلـصـقـات", key: "sticker", icon: "🌄" },
+  { n: 4, name: "الـمـطـوريـن", key: "owners", icon: "🇩🇪" },
+  { n: 5, name: "الادمــن", key: "admins", icon: "👨🏻‍⚖️" },
+  { n: 6, name: "الالــعـاب", key: "games", icon: "🎮" },
+  { n: 7, name: "الـتـرفـيـه والـمـرح", key: "fun", icon: "🎭" },
+  { n: 8, name: "الـلـوجـو والـتـصـمـيـم", key: "logos", icon: "🎨" },
+  { n: 9, name: "الـبـحـث", key: "search", icon: "🔍" },
+  { n: 10, name: "الـذكـاء الاصـطـنـاعـي", key: "ai", icon: "🤖" },
+  { n: 11, name: "الادوات والـتـحـويـلات", key: "tools", icon: "🛠️" },
+  { n: 12, name: "الـبـوتـات الـفـرعـي", key: "sub", icon: "♥️" },
+  { n: 13, name: "الـمـعـلـومـات", key: "info", icon: "ℹ️" },
+  { n: 14, name: "الـجـيـف", key: "gif", icon: "🎞️" },
+  { n: 15, name: "كـل الأوامـر", key: "all", icon: "🪻" }
+];
 
-  const CATEGORIES = [
-    [1, "التـحـمـيـل", "downloads", "📂"],
-    [2, "الـمـجـمـوعـات", "groups", "🐞"],
-    [3, "الـمـلـصـقـات", "sticker", "🌄"],
-    [4, "الـمـطـوريـن", "owners", "🇩🇪"],
-    [5, "الادمــن", "admins", "👨🏻‍⚖️"],
-    [6, "الالــعـاب", "games", "🎮"],
-    [7, "الـتـرفـيـه والـمـرح", "fun", "🎭"],
-    [8, "الـلـوجـو والـتـصـمـيـم", "logos", "🎨"],
-    [9, "الـبـحـث", "search", "🔍"],
-    [10, "الـذكـاء الاصـطـنـاعـي", "ai", "🤖"],
-    [11, "الادوات والـتـحـويـلات", "tools", "🛠️"],
-    [12, "الـبـوتـات الـفـرعـي", "sub", "♥️"],
-    [13, "الـمـعـلـومـات", "info", "ℹ️"],
-    [14, "الـجـيـف", "gif", "🎞️"],
-    [15, "كـل الأوامـر", "all", "🪻"],
-  ];
-
-  const CATEGORY_ALIASES = {
-    download: "downloads",
-    downloads: "downloads",
-    group: "groups",
-    groups: "groups",
-    general: "groups",
-    sticker: "sticker",
-    stickers: "sticker",
-    owner: "owners",
-    owners: "owners",
-    admin: "admins",
-    admins: "admins",
-    game: "games",
-    games: "games",
-    fun: "fun",
-    logo: "logos",
-    logos: "logos",
-    search: "search",
-    sarech: "search",
-    ai: "ai",
-    tool: "tools",
-    tools: "tools",
-    sub: "sub",
-    subs: "sub",
-    subbot: "sub",
-    subbots: "sub",
-    info: "info",
-    information: "info",
-    gif: "gif",
-    gifs: "gif",
-  };
-
-  const resolveCategory = (c) => {
-    const rawCat = typeof c.category === "string" ? c.category.trim().toLowerCase() : "";
-    if (rawCat && CATEGORY_ALIASES[rawCat]) {
-      return CATEGORY_ALIASES[rawCat];
-    }
-    if (rawCat) return rawCat;
-    if (c.owner) return "owners";
-    return "tools";
-  };
-
-  const getCat = (n) => CATEGORIES.find((c) => c[0] === n);
-  const selected = parseInt(args[0]);
-
-  if (!selected && !args[0]) {
-    const sections = [
-      {
-        title: "🪻 ~ الاقـسـام ~ 🪻",
-        rows: CATEGORIES.map((c) => ({
-          title: `⦑ ${c[0]} ⦒ ⦂ ${c[1]} ${c[3]}`,
-          description: `↳ اضغط لعرض ${c[2] === "all" ? "جميع أوامر البوت" : `أوامر قسم ${c[1]}`}`,
-          id: `.${command} ${c[0]}`,
-        })),
-      },
-    ];
-
-    const menuText = `
-رَبَّنَا اغْفِرْ لَنَا وَلِإِخْوَانِنَا الَّذِينَ سَبَقُونَا بِالْإِيمَانِ
-وَلَا تَجْعَلْ فِي قُلُوبِنَا غِلًّا لِّلَّذِينَ آمَنُوا رَبَّنَا إِنَّكَ رَءُوفٌ رَّحِيمٌ
-
-  .─ִ╾ׄ─ִ─ִ╾ ࣪🪻.─ִ╾ׄ─ִ─ִ╾ ࣪
-  
-  *『 🪻 اهـلا → [ @${senderNum} ] 』*
-  
-  .─ִ╾ׄ─ִ─ִ╾ ࣪🪻.─ִ╾ׄ─ִ─ִ╾ ࣪
-
-*🪻 ⇢ قـائـمـة الأوامـر*
-_↳ اختار قسم من القائمة عشان يبعتلك اوامر القسم_`;
-
-    await conn.buttonV3(
-      m.chat,
-      {
-        image: MENU_IMG,
-        text: menuText,
-        footer: "reze ⇆ 𝐛𝐲 : 𝐕𝐈𝐈𝟕",
-        buttons: [
-          {
-            name: "single_select",
-            params: {
-              title: "الاوامر",
-              sections: sections,
-            },
-          },
-          {
-            name: "quick_reply",
-            params: {
-              display_text: "القناة",
-              url: "https://whatsapp.com/channel/0029VaQim2bAu3aPsRVaDq3v",
-            },
-          },
-        ],
-        mentions: [m.sender],
-        contextInfo: cli?.config?.info?.channel,
-      },
-      { quoted: status },
-    );
-    return;
-  }
-
-  const cat = getCat(selected);
-  if (!cat) {
-    await conn.sendMessage(
-      m.chat,
-      {
-        text: `🪻: اختار رقم صحيح من 1 لـ ${CATEGORIES.length}`,
-        contextInfo: cli?.config?.info?.channel,
-      },
-      { quoted: status },
-    );
-    return;
-  }
-
-  const cmds = await cli.commands();
-  const categoryCmds = cmds.filter((c) => {
-    const cmdList = Array.isArray(c.command) ? c.command : [c.command];
-    if (cmdList.includes("اوامر") || cmdList.includes("menu")) return false;
-    if (cat[2] === "all") return true;
-    return resolveCategory(c) === cat[2];
-  });
-
-  const cmdsList = categoryCmds
-    .flatMap((c) => {
-      const rawUsage = c.usage ?? c.useg ?? [];
-      const list = Array.isArray(rawUsage) ? rawUsage : [rawUsage];
-      return list
-        .filter((u) => typeof u === "string" && u.trim())
-        .map((cmd) => {
-          const cleanCmd = cmd.trim().replace(/^[./]/, "");
-          return `⦑ ${cat[3]} ⦒ ⦂ .${cleanCmd}`;
-        });
-    })
-    .join("\n");
-
-  if (!cmdsList.length) {
-    await conn.sendMessage(
-      m.chat,
-      { text: "🪻: القسم فاضي", contextInfo: cli?.config?.info?.channel },
-      { quoted: status },
-    );
-    return;
-  }
-
-  const sectionText = `*⪩ ${cat[2] === "all" ? "كـل أوامـر الـبـوت" : `قـسـم ${cat[1]}`} ${cat[3]} ↯ •*
-── ⋅ ⋅ ── 🪻 ── ⋅ ⋅ ── 
-
-${cmdsList}
-
-── ⋅ ⋅ ── 🪻 ── ⋅ ⋅ ── 
-⦑ 🪻 ⦒ ⦂ ~ ${cli?.config?.info?.nameBot || "Reze_bot"} ↜ ⟦ رَبَّنَا اغْفِرْ لَنَا وَلِإِخْوَانِنَا ❤️ ⟧
-> ⦂ 𝐫𝐞𝐳𝐞 ↚ 𝐛𝐲 : 𝐕𝐈𝐈𝟕 ╷`.trim();
-
-  await conn.linkPreview(
-    m.chat,
-    {
-      text: sectionText,
-      url: MENU_IMG,
-      height: 438,
-      width: 734,
-      title: "𝐑 𝐄 𝐙 𝐄 — 𝐕𝐈𝐈7 🪻 | 𝐁𝐨𝐭 𝐢𝐬 𝐛𝐮𝐢𝐥𝐭 𝐨𝐧 𝐭𝐡𝐞 𝐌𝐄𝐎𝐖𝐒𝐀𝐁 𝐅𝐫𝐚𝐦𝐞𝐰𝐨𝐫𝐤",
-      description: cat[2] === "all" ? "قـائـمـة جـمـيـع أوامـر الـبـوت 🪻" : `قـائـمـة أوامـر قـسـم ${cat[1]} ${cat[3]}`,
-    },
-    { quoted: status },
-  );
+const ALIASES = {
+  download: "downloads", downloads: "downloads",
+  group: "groups", groups: "groups", general: "groups",
+  sticker: "sticker", stickers: "sticker",
+  owner: "owners", owners: "owners",
+  admin: "admins", admins: "admins",
+  game: "games", games: "games",
+  fun: "fun",
+  logo: "logos", logos: "logos",
+  search: "search",
+  ai: "ai",
+  tool: "tools", tools: "tools",
+  sub: "sub", subs: "sub", subbot: "sub", subbots: "sub",
+  info: "info", information: "info",
+  gif: "gif", gifs: "gif",
+  all: "all"
 };
 
-handler.command = ["اوامر", "menu"];
-export default handler;
+// ضيف أوامرك هنا: cmd بدون نقطة، cat من مفاتيح الأقسام فوق
+const COMMANDS = [
+  { cmd: "menu", cat: "info", desc: "عرض القائمة" },
+  // { cmd: "قرآن", cat: "sub", desc: "..." },
+  // { cmd: "ستيكر", cat: "sticker", desc: "..." },
+];
+
+function resolveCategory(arg) {
+  const a = String(arg || "").trim().toLowerCase();
+  if (/^\d+$/.test(a)) return CATEGORIES.find(c => c.n === Number(a));
+  const key = ALIASES[a];
+  return key ? CATEGORIES.find(c => c.key === key) : null;
+}
+
+function buildCategoryText(cat) {
+  const items = COMMANDS.filter(c => cat.key === "all" || c.cat === cat.key);
+  if (!items.length) return null;
+
+  return items.map(c => {
+    const icon = CATEGORIES.find(x => x.key === c.cat)?.icon || "🪻";
+    return `⦑ ${icon} ⦒ ⦂ .${c.cmd}`;
+  }).join("\n");
+}
+
+module.exports = async function menu(sock, m, text) {
+  const parts = text.trim().split(/\s+/);
+  if (!TRIGGERS.includes(parts[0].toLowerCase())) return false;
+
+  const jid = m.key.remoteJid;
+  const sender = m.key.participant || jid;
+  const num = sender.split("@")[0].split(":")[0];
+  const arg = parts[1];
+
+  // القائمة الرئيسية
+  if (!arg) {
+    const list = CATEGORIES.map(c => `⦑ ${c.n} ⦒ ⦂ ${c.name} ${c.icon}`).join("\n");
+
+    await sock.sendMessage(jid, {
+      image: { url: MENU_IMG },
+      caption:
+        "رَبَّنَا اغْفِرْ لَنَا وَلِإِخْوَانِنَا الَّذِينَ سَبَقُونَا بِالْإِيمَانِ\n\n" +
+        `🪻 اهلا → @${num}\n\n` +
+        "*🪻 قائمة الأوامر*\n" +
+        "_اكتب .menu ورقم القسم عشان تشوف أوامره_\n\n" +
+        list +
+        `\n\n> ${BOT_NAME}`,
+      mentions: [sender]
+    }, { quoted: m });
+    return true;
+  }
+
+  // أوامر قسم معين
+  const cat = resolveCategory(arg);
+  if (!cat) {
+    await sock.sendMessage(jid, {
+      text: `🪻: اختار رقم صحيح من 1 لـ ${CATEGORIES.length}`
+    }, { quoted: m });
+    return true;
+  }
+
+  const body = buildCategoryText(cat);
+  await sock.sendMessage(jid, {
+    text: body
+      ? `*⪩ قـسـم ${cat.name} ${cat.icon}*\n── ⋅ ⋅ ── 🪻 ── ⋅ ⋅ ──\n\n${body}\n\n── ⋅ ⋅ ── 🪻 ── ⋅ ⋅ ──\n> ${BOT_NAME}`
+      : "🪻: القسم فاضي"
+  }, { quoted: m });
+  return true;
+};
