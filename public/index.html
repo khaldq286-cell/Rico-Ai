@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -302,22 +301,240 @@
   </main>
 </div>
 
-<script src="/script.js"></script>
-
 <script>
-  const menuToggle = document.getElementById("menuToggle");
-  const sidebar = document.getElementById("sidebar");
+/* ================= القائمة الجانبية ================= */
+const menuToggle = document.getElementById("menuToggle");
+const sidebar = document.getElementById("sidebar");
 
-  menuToggle.addEventListener("click", () => {
-    sidebar.classList.toggle("sidebar-open");
+menuToggle.addEventListener("click", () => {
+  sidebar.classList.toggle("sidebar-open");
+});
+
+document.querySelectorAll(".nav-link").forEach(link => {
+  link.addEventListener("click", () => {
+    sidebar.classList.remove("sidebar-open");
+  });
+});
+
+/* ================= المنطق ================= */
+const $ = id => document.getElementById(id);
+
+const pairForm = $("pairForm");
+const country = $("country");
+const phoneInput = $("phone");
+const pairButton = $("pairButton");
+const result = $("result");
+const pairCode = $("pairCode");
+const copyCode = $("copyCode");
+const timerText = $("timer");
+const messageBox = $("message");
+
+const developerLogin = $("developerLogin");
+const adminPassword = $("adminPassword");
+const developerDashboard = $("developerDashboard");
+const developerLogout = $("developerLogout");
+
+let countdown = null;
+let statusPoll = null;
+
+function setMessage(text, type = "info") {
+  messageBox.textContent = text;
+  messageBox.className = type;
+}
+
+async function api(url, body) {
+  const res = await fetch(url, {
+    method: body ? "POST" : "GET",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin"
   });
 
-  document.querySelectorAll(".nav-link").forEach(link => {
-    link.addEventListener("click", () => {
-      sidebar.classList.remove("sidebar-open");
-    });
-  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.success === false) {
+    const err = new Error(data.message || "صار خطأ في السيرفر");
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+function fillStats(s) {
+  $("usersCount").textContent = s.users;
+  $("connectionsCount").textContent = s.connections;
+  $("failedCount").textContent = s.failed;
+  $("limitCount").textContent = s.limit;
+}
+
+async function loadPublicStats() {
+  try { fillStats(await api("/api/stats")); } catch {}
+}
+
+/* ----- التنصيب ----- */
+
+function startCountdown(seconds) {
+  clearInterval(countdown);
+  let left = seconds;
+  timerText.textContent = `ينتهي الرمز بعد ${left} ثانية`;
+
+  countdown = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(countdown);
+      timerText.textContent = "انتهت صلاحية الرمز، اضغط تنصيب البوت مرة ثانية";
+      return;
+    }
+    timerText.textContent = `ينتهي الرمز بعد ${left} ثانية`;
+  }, 1000);
+}
+
+function watchConnection(phone) {
+  clearInterval(statusPoll);
+  let tries = 0;
+
+  statusPoll = setInterval(async () => {
+    tries++;
+    if (tries > 60) return clearInterval(statusPoll);
+
+    try {
+      const s = await api("/api/pair/status?phone=" + phone);
+      if (s.status === "connected") {
+        clearInterval(statusPoll);
+        clearInterval(countdown);
+        timerText.textContent = "";
+        setMessage("تم ربط البوت بنجاح ✓", "success");
+        loadPublicStats();
+      }
+    } catch {}
+  }, 3000);
+}
+
+pairForm.addEventListener("submit", async e => {
+  e.preventDefault();
+
+  const local = phoneInput.value.replace(/\D/g, "").replace(/^0+/, "");
+  const phone = country.value + local;
+
+  if (local.length < 6) {
+    return setMessage("ادخل رقم الهاتف بدون رمز الدولة", "error");
+  }
+
+  pairButton.disabled = true;
+  result.hidden = true;
+  setMessage("جاري طلب رمز الاقتران…");
+
+  try {
+    const data = await api("/api/pair", { phone });
+
+    pairCode.textContent = data.code;
+    result.hidden = false;
+    setMessage(data.message || "أدخل الرمز في واتساب", "success");
+
+    startCountdown(data.expiresIn || 60);
+    watchConnection(phone);
+  } catch (err) {
+    setMessage(err.message, "error");
+  } finally {
+    pairButton.disabled = false;
+  }
+});
+
+copyCode.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(pairCode.textContent);
+    copyCode.textContent = "تم النسخ ✓";
+    setTimeout(() => (copyCode.textContent = "نسخ الرمز"), 2000);
+  } catch {
+    setMessage("انسخ الرمز يدوياً: " + pairCode.textContent, "info");
+  }
+});
+
+/* ----- لوحة المطور ----- */
+
+async function loadDeveloperStats() {
+  try {
+    fillStats(await api("/api/developer/stats"));
+  } catch (err) {
+    if (err.status === 401) showLogin();
+  }
+}
+
+function showDashboard() {
+  developerLogin.hidden = true;
+  developerDashboard.hidden = false;
+  loadDeveloperStats();
+}
+
+function showLogin() {
+  developerLogin.hidden = false;
+  developerDashboard.hidden = true;
+}
+
+developerLogin.addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    await api("/api/developer/login", { password: adminPassword.value });
+    adminPassword.value = "";
+    showDashboard();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+developerLogout.addEventListener("click", async () => {
+  try { await api("/api/developer/logout", {}); } catch {}
+  showLogin();
+});
+
+$("limitForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    const d = await api("/api/developer/limit", { limit: Number($("newLimit").value) });
+    alert("تم تحديث الحد إلى " + d.limit);
+    $("newLimit").value = "";
+    loadDeveloperStats();
+  } catch (err) { alert(err.message); }
+});
+
+$("banForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    await api("/api/developer/ban", { phone: $("banPhone").value });
+    alert("تم حظر الرقم");
+    $("banPhone").value = "";
+  } catch (err) { alert(err.message); }
+});
+
+$("unbanForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    await api("/api/developer/unban", { phone: $("unbanPhone").value });
+    alert("تم إلغاء الحظر");
+    $("unbanPhone").value = "";
+  } catch (err) { alert(err.message); }
+});
+
+$("announcementForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    const d = await api("/api/developer/announce", { announcement: $("announcement").value });
+    alert("تم إرسال الإعلان لـ " + (d.sent ?? 0) + " رقم");
+    $("announcement").value = "";
+  } catch (err) { alert(err.message); }
+});
+
+/* ----- البداية ----- */
+(async () => {
+  loadPublicStats();
+  try {
+    await api("/api/developer/stats");
+    showDashboard();
+  } catch {
+    showLogin();
+  }
+})();
 </script>
 
 </body>
-</html>
+        </html>
