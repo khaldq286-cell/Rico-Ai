@@ -62,14 +62,20 @@ function loadDatabase() {
   }
 }
 
+let saveTimer = null;
+// حفظ متجمّع بدل ما يكتب على الملف مع كل أمر
 function saveDatabase() {
-  try {
-    const temp = DB_FILE + ".tmp";
-    fs.writeFileSync(temp, JSON.stringify(db, null, 2));
-    fs.renameSync(temp, DB_FILE);
-  } catch (error) {
-    console.error("DATABASE SAVE ERROR:", error.message);
-  }
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      const temp = DB_FILE + ".tmp";
+      fs.writeFileSync(temp, JSON.stringify(db, null, 2));
+      fs.renameSync(temp, DB_FILE);
+    } catch (error) {
+      console.error("DATABASE SAVE ERROR:", error.message);
+    }
+  }, 500);
 }
 
 loadDatabase();
@@ -89,12 +95,19 @@ function getToken(req) {
   return match ? match[1] : null;
 }
 
+function cleanExpiredTokens() {
+  const now = Date.now();
+  for (const [token, expires] of adminTokens) {
+    if (expires < now) adminTokens.delete(token);
+  }
+}
+
 function requireAdmin(req, res, next) {
+  cleanExpiredTokens();
   const token = getToken(req);
   const expires = token ? adminTokens.get(token) : null;
 
-  if (!expires || expires < Date.now()) {
-    if (token) adminTokens.delete(token);
+  if (!expires) {
     return res.status(401).json({ success: false, message: "سجل دخول المطور من جديد" });
   }
   next();
@@ -126,7 +139,6 @@ function topCommands(period) {
 
 // ================= WHATSAPP (Baileys) =================
 
-// ضع أوامر البوت هنا. الدالة بتاخد (sock, message, phone)
 let commandHandler = async (sock, m, phone) => {
   const msg = m.message || {};
   const text = msg.conversation || msg.extendedTextMessage?.text || "";
@@ -138,7 +150,8 @@ let commandHandler = async (sock, m, phone) => {
   }
 };
 
-async function createSocket(authPath) {
+// إنشاء socket جديد. الـ listeners بتتسجل هنا مرة واحدة لكل socket
+async function createSocket(phone, authPath) {
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
 
   let version;
@@ -160,7 +173,6 @@ async function createSocket(authPath) {
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
-    const phone = path.basename(authPath);
 
     for (const m of messages) {
       if (!m.message || m.key.fromMe) continue;
@@ -176,28 +188,39 @@ async function createSocket(authPath) {
     }
   });
 
-  return { sock, state, DisconnectReason };
-}
-
-async function connectWhatsApp(phone, sessionDir) {
-  const authPath = path.join(sessionDir, phone);
-  const result = await createSocket(authPath);
-
-  if (!result.state.creds.registered) {
-    await sleep(2500);
-    const code = await result.sock.requestPairingCode(phone, PAIR_CODE);
-    return { ...result, code };
-  }
-
-  throw new Error("الرقم دا منصب أصلاً");
+  return { sock, state };
 }
 
 // ================= SESSIONS =================
 
-function attachSocketEvents(phone, session, authPath) {
+function createSession(phone) {
+  return {
+    sock: null,
+    state: null,
+    status: "connecting",
+    retryCount: 0,
+    reconnectTimer: null,
+    createdAt: Date.now()
+  };
+}
+
+function destroySession(phone) {
+  const s = sessions.get(phone);
+  if (!s) return;
+  clearTimeout(s.reconnectTimer);
+  s.reconnectTimer = null;
+  try { s.sock?.end(undefined); } catch {}
+  sessions.delete(phone);
+}
+
+// يربط حدث الاتصال على الـ socket الحالي فقط
+function attachConnectionEvents(phone, session, authPath) {
   const sock = session.sock;
 
-  sock.ev.on("connection.update", async update => {
+  sock.ev.on("connection.update", update => {
+    // تجاهل التحديثات من socket قديم
+    if (session.sock !== sock) return;
+
     const { connection, lastDisconnect } = update;
 
     if (connection === "open") {
@@ -215,7 +238,7 @@ function attachSocketEvents(phone, session, authPath) {
 
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
-        sessions.delete(phone);
+        destroySession(phone);
         fs.rmSync(authPath, { recursive: true, force: true });
         return;
       }
@@ -225,6 +248,8 @@ function attachSocketEvents(phone, session, authPath) {
       session.retryCount++;
       if (session.retryCount > 5) {
         console.log("RECONNECT LIMIT:", phone);
+        db.failedConnections++;
+        saveDatabase();
         return;
       }
 
@@ -234,10 +259,10 @@ function attachSocketEvents(phone, session, authPath) {
 
         try {
           session.status = "connecting";
-          const result = await createSocket(authPath);
+          const result = await createSocket(phone, authPath);
           session.sock = result.sock;
           session.state = result.state;
-          attachSocketEvents(phone, session, authPath);
+          attachConnectionEvents(phone, session, authPath);
         } catch (error) {
           console.error("RECONNECT ERROR:", error.message);
           session.status = "disconnected";
@@ -256,23 +281,18 @@ function isRegistered(phone) {
   }
 }
 
-// التنصيب التلقائي: بيرجّع الجلسة المحفوظة
+// استعادة جلسة محفوظة
 async function restoreSession(phone) {
-  const authPath = path.join(SESSION_DIR, phone);
-  const session = {
-    sock: null,
-    state: null,
-    status: "connecting",
-    retryCount: 0,
-    reconnectTimer: null,
-    createdAt: Date.now()
-  };
+  destroySession(phone);
 
+  const authPath = path.join(SESSION_DIR, phone);
+  const session = createSession(phone);
   sessions.set(phone, session);
-  const result = await createSocket(authPath);
+
+  const result = await createSocket(phone, authPath);
   session.sock = result.sock;
   session.state = result.state;
-  attachSocketEvents(phone, session, authPath);
+  attachConnectionEvents(phone, session, authPath);
 }
 
 async function restoreAllSessions() {
@@ -306,8 +326,9 @@ app.get("/api/public", (req, res) => {
 
 // إحصائيات عامة للصفحة الرئيسية (بدون بيانات حساسة)
 app.get("/api/stats", (req, res) => {
+  const connected = [...sessions.values()].filter(s => s.status === "connected").length;
   res.json({
-    users: sessions.size,
+    users: connected,
     connections: db.totalConnections,
     failed: db.failedConnections,
     limit: db.installLimit + db.installAdjust
@@ -328,6 +349,9 @@ app.post("/api/pair", async (req, res) => {
   if (db.bannedUsers.includes(phone)) {
     return res.status(403).json({ success: false, message: "هذا الرقم محظور" });
   }
+  if (isRegistered(phone)) {
+    return res.status(409).json({ success: false, message: "الرقم دا منصب أصلاً" });
+  }
   if (sessions.has(phone)) {
     return res.status(409).json({ success: false, message: "يوجد طلب ربط لهذا الرقم" });
   }
@@ -336,30 +360,28 @@ app.post("/api/pair", async (req, res) => {
   }
 
   const authPath = path.join(SESSION_DIR, phone);
-  const session = {
-    sock: null,
-    state: null,
-    status: "connecting",
-    retryCount: 0,
-    reconnectTimer: null,
-    createdAt: Date.now()
-  };
+  const session = createSession(phone);
   sessions.set(phone, session);
 
   try {
-    const result = await connectWhatsApp(phone, SESSION_DIR);
-    session.sock = result.sock;
-    session.state = result.state;
-    attachSocketEvents(phone, session, authPath);
+    const { sock, state } = await createSocket(phone, authPath);
+    session.sock = sock;
+    session.state = state;
 
-    return res.json({ success: true, code: result.code, expiresIn: 60, message: "أدخل كود الربط في واتساب" });
+    if (state.creds.registered) {
+      throw new Error("الرقم دا منصب أصلاً");
+    }
+
+    await sleep(2500);
+    const code = await sock.requestPairingCode(phone, PAIR_CODE);
+    attachConnectionEvents(phone, session, authPath);
+
+    return res.json({ success: true, code, expiresIn: 60, message: "أدخل كود الربط في واتساب" });
   } catch (error) {
     console.error("PAIR ERROR:", error.message);
     db.failedConnections++;
     saveDatabase();
-
-    sessions.delete(phone);
-    try { session.sock?.end(undefined); } catch {}
+    destroySession(phone);
 
     return res.status(500).json({ success: false, message: "تعذر طلب كود الاقتران", error: error.message });
   }
@@ -381,10 +403,6 @@ app.post("/api/reconnect", async (req, res) => {
   }
 
   try {
-    const old = sessions.get(phone);
-    try { old?.sock?.end(undefined); } catch {}
-    sessions.delete(phone);
-
     await restoreSession(phone);
     res.json({ success: true });
   } catch {
@@ -396,27 +414,36 @@ app.post("/api/reconnect", async (req, res) => {
 
 app.post("/api/developer/login", (req, res) => {
   const password = String(req.body.password || "");
-  const inputHash = crypto.createHash("sha256").update(password).digest();
-  const adminHash = crypto.createHash("sha256").update(ADMIN_CODE).digest();
-
-  if (!password || !crypto.timingSafeEqual(inputHash, adminHash)) {
+  if (!password) {
     return res.status(401).json({ success: false, message: "كود التفعيل غير صحيح" });
   }
 
+  const inputHash = crypto.createHash("sha256").update(password).digest();
+  const adminHash = crypto.createHash("sha256").update(ADMIN_CODE).digest();
+
+  if (!crypto.timingSafeEqual(inputHash, adminHash)) {
+    return res.status(401).json({ success: false, message: "كود التفعيل غير صحيح" });
+  }
+
+  cleanExpiredTokens();
   const token = crypto.randomBytes(32).toString("hex");
   adminTokens.set(token, Date.now() + 8 * 60 * 60 * 1000);
 
   const secure = req.secure || req.headers["x-forwarded-proto"] === "https";
   res.setHeader(
     "Set-Cookie",
-    `rico_admin=${token}; HttpOnly; ${secure ? "Secure;" : ""} SameSite=Lax; Path=/; Max-Age=28800`
+    `rico_admin=${token}; HttpOnly; ${secure ? "Secure; " : ""}SameSite=Lax; Path=/; Max-Age=28800`
   );
   res.json({ success: true });
 });
 
 app.post("/api/developer/logout", requireAdmin, (req, res) => {
   adminTokens.delete(getToken(req));
-  res.setHeader("Set-Cookie", "rico_admin=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0");
+  const secure = req.secure || req.headers["x-forwarded-proto"] === "https";
+  res.setHeader(
+    "Set-Cookie",
+    `rico_admin=; HttpOnly; ${secure ? "Secure; " : ""}SameSite=Lax; Path=/; Max-Age=0`
+  );
   res.json({ success: true });
 });
 
@@ -446,7 +473,8 @@ app.post("/api/developer/limit", requireAdmin, (req, res) => {
 });
 
 app.post("/api/developer/adjust", requireAdmin, (req, res) => {
-  db.installAdjust += parseInt(req.body.delta, 10) || 0;
+  const delta = parseInt(req.body.delta, 10);
+  db.installAdjust += Number.isFinite(delta) ? delta : 0;
   saveDatabase();
   res.json({ success: true, limit: db.installLimit + db.installAdjust });
 });
@@ -480,11 +508,7 @@ app.post("/api/developer/ban", requireAdmin, (req, res) => {
     saveDatabase();
   }
 
-  const s = sessions.get(phone);
-  if (s) {
-    try { s.sock?.end(undefined); } catch {}
-    sessions.delete(phone);
-  }
+  destroySession(phone);
   res.json({ success: true });
 });
 
@@ -532,6 +556,14 @@ app.use((error, req, res, next) => {
 });
 
 // ================= START =================
+
+process.on("SIGINT", () => {
+  try {
+    fs.writeFileSync(DB_FILE + ".tmp", JSON.stringify(db, null, 2));
+    fs.renameSync(DB_FILE + ".tmp", DB_FILE);
+  } catch {}
+  process.exit(0);
+});
 
 app.listen(PORT, () => {
   console.log("RICO BOT SERVER STARTED:", PORT);
