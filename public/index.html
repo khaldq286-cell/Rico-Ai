@@ -2,357 +2,163 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0612">
-<title>RICO BOT | Premium System</title>
+<title>RICO BOT</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#ffc832;--purple:#8b5cf6;--bg:#0a0612;--card:#150e26;--card2:#1d1433;--text:#f4f0ff;--muted:#9b90bd;--border:rgba(255,255,255,.12);--green:#22c55e;--red:#fb7185}
 [hidden]{display:none!important}
-html{scroll-behavior:smooth}
-body{font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;position:relative}
-a{color:inherit;text-decoration:none}
-button,input,select,textarea{font-family:inherit}
+body{font-family:Tahoma,Arial,sans-serif;background:radial-gradient(600px 400px at 85% -5%,rgba(139,92,246,.35),transparent),radial-gradient(500px 400px at 0% 100%,rgba(255,200,50,.18),transparent),var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden}
+button,input,select{font-family:inherit}
 
-/* الخلفية */
-.background-effects{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
-.glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.45}
-.glow-one{width:420px;height:420px;background:var(--purple);top:-120px;left:-100px}
-.glow-two{width:380px;height:380px;background:var(--gold);bottom:-120px;right:-100px;opacity:.25}
+/* شاشة الترحيب */
+.welcome{text-align:center;width:100%;max-width:380px}
+.logo{width:96px;height:96px;margin:0 auto 22px;border-radius:28px;background:linear-gradient(135deg,var(--gold),var(--purple));display:grid;place-items:center;font:900 52px Arial,sans-serif;color:#fff;box-shadow:0 0 40px rgba(139,92,246,.6)}
+.welcome h1{font-size:28px;font-weight:900;line-height:1.5}
+.welcome h1 span,.title{background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+.welcome p{color:var(--muted);margin:10px 0 28px;font-size:15px;line-height:1.8}
 
-/* الشريط العلوي */
-.topbar{position:fixed;top:0;left:0;right:0;z-index:50;height:64px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;background:rgba(10,6,18,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:1px}
-.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--gold),var(--purple));display:grid;place-items:center;font:900 22px Arial,sans-serif;color:#fff;box-shadow:0 0 22px rgba(139,92,246,.6)}
-.top-status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:14px}
-.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
-.menu-toggle{display:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:20px;cursor:pointer}
+.btn{border:0;cursor:pointer;border-radius:16px;font-weight:900;font-size:17px;padding:15px 20px;color:#17081f;background:linear-gradient(90deg,var(--gold),var(--purple));box-shadow:0 10px 30px rgba(139,92,246,.35);transition:transform .15s;width:100%}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.6}
+.btn.ghost{background:var(--card2);color:var(--text);border:1px solid var(--border);box-shadow:none}
+.btn.danger{background:transparent;color:var(--red);border:1px solid var(--red);box-shadow:none}
 
-/* التخطيط */
-.app-layout{display:flex;min-height:100vh;padding-top:64px}
-.sidebar{width:260px;flex-shrink:0;position:sticky;top:64px;height:calc(100vh - 64px);background:rgba(21,14,38,.9);border-left:1px solid var(--border);padding:24px 16px;display:flex;flex-direction:column;gap:24px;overflow-y:auto}
-.sidebar-logo{text-align:center}
-.sidebar-logo .logo{margin:0 auto 10px;width:64px;height:64px;font-size:32px;border-radius:18px}
-.sidebar-logo h2{font-size:20px;font-weight:900;letter-spacing:1px}
-.sidebar-logo p{color:var(--muted);font-size:12px;letter-spacing:2px;margin-top:4px}
-.online-label{display:inline-block;margin-top:10px;color:var(--green);font-size:12px;font-weight:700}
-.side-nav{display:flex;flex-direction:column;gap:8px}
-.nav-link{padding:12px 14px;border-radius:12px;color:var(--muted);font-weight:700;font-size:15px;transition:.2s}
-.nav-link:hover{color:var(--text);background:var(--card2)}
-.nav-link.active{color:#17081f;background:linear-gradient(90deg,var(--gold),var(--purple))}
-.sidebar-footer{margin-top:auto;text-align:center;color:var(--muted);font-size:12px}
-.sidebar-footer h3{color:var(--text);font-size:15px}
+/* النوافذ */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;z-index:30;padding:0;backdrop-filter:blur(4px)}
+.sheet{background:var(--card);border:1px solid var(--border);border-radius:26px 26px 0 0;padding:24px 20px calc(24px + env(safe-area-inset-bottom,0px));width:100%;max-width:460px;max-height:90vh;overflow:auto;position:relative}
+@media (min-width:600px){.modal{align-items:center}.sheet{border-radius:26px}}
+.sheet h2{font-size:22px;font-weight:900;margin-bottom:6px}
+.sheet .sub{color:var(--muted);font-size:14px;margin-bottom:18px;line-height:1.7}
+.close{position:absolute;top:14px;left:14px;width:36px;height:36px;border-radius:12px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:18px;cursor:pointer}
 
-.main-content{flex:1;min-width:0;padding:24px;display:flex;flex-direction:column;gap:24px}
-section{scroll-margin-top:80px}
+input{width:100%;padding:15px 16px;border-radius:14px;border:2px solid var(--border);background:var(--card2);color:var(--text);font-size:20px;direction:ltr;text-align:center;letter-spacing:1px;outline:none}
+input:focus{border-color:var(--gold)}
+.country{height:24px;color:var(--gold);font-weight:700;text-align:center;margin:8px 0 14px;font-size:15px}
+.msg{min-height:22px;text-align:center;margin-top:12px;font-size:14px;color:var(--muted);line-height:1.7}
+.msg.ok{color:var(--green);font-weight:700}
+.msg.err{color:var(--red);font-weight:700}
 
-/* الرئيسية */
-.hero-section{display:flex;align-items:center;gap:32px;background:var(--card);border:1px solid var(--border);border-radius:28px;padding:32px}
-.hero-character{flex-shrink:0}
-.character-ring{width:200px;height:200px;border-radius:50%;padding:6px;background:linear-gradient(135deg,var(--gold),var(--purple));box-shadow:0 0 40px rgba(139,92,246,.5)}
-.character-ring .big-logo{width:100%;height:100%;border-radius:50%;background:var(--card);display:grid;place-items:center;font:900 110px Arial,sans-serif;background-image:linear-gradient(135deg,var(--gold),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero-content{flex:1;min-width:0}
-.hero-tag{display:inline-block;font-size:12px;letter-spacing:2px;color:var(--gold);border:1px solid rgba(255,200,50,.4);padding:6px 12px;border-radius:999px}
-.main-title{font-size:56px;font-weight:900;line-height:1.1;margin:14px 0 8px;background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero-content h2{font-size:22px;margin-bottom:12px}
-.hero-content p{color:var(--muted);line-height:1.9;font-size:16px;margin-bottom:20px}
-
-.main-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 24px;border-radius:14px;border:0;cursor:pointer;background:linear-gradient(90deg,var(--gold),var(--purple));color:#17081f;font-weight:900;font-size:16px;box-shadow:0 10px 30px rgba(139,92,246,.35);transition:transform .2s}
-.main-button:hover{transform:translateY(-2px)}
-.main-button:disabled{opacity:.6;cursor:not-allowed;transform:none}
-
-/* الإحصائيات */
-.stats-section{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.stat-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:20px;text-align:center}
-.stat-card span{display:block;color:var(--muted);font-size:14px;margin-bottom:8px}
-.stat-card strong{font-size:32px;font-weight:900;color:var(--gold)}
-
-/* البانلات */
-.panel{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:28px}
-.section-heading{display:flex;align-items:center;gap:16px;margin-bottom:24px}
-.section-heading h2{font-size:24px;font-weight:900}
-.section-heading p{color:var(--muted);font-size:14px;margin-top:4px}
-.section-icon{width:56px;height:56px;border-radius:16px;flex-shrink:0;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),var(--purple));color:#17081f;font:900 18px Arial,sans-serif}
-
-/* النماذج */
-form{display:flex;flex-direction:column;gap:10px}
-label{color:var(--muted);font-size:14px;font-weight:700;margin-top:6px}
-input,select,textarea{width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;outline:none;transition:.2s}
-input:focus,select:focus,textarea:focus{border-color:var(--gold)}
-select option{background:var(--card2);color:var(--text)}
-textarea{min-height:110px;resize:vertical}
-#pairForm .main-button,#developerLogin .main-button{margin-top:10px}
-
-.pair-code{direction:ltr;text-align:center;font:900 34px Arial,sans-serif;letter-spacing:6px;padding:18px;border-radius:16px;margin:12px 0;background:var(--card2);border:2px solid var(--gold);color:var(--gold)}
-.copy-button{width:100%;padding:12px;border-radius:14px;cursor:pointer;background:var(--card2);border:1px solid var(--border);color:var(--text);font-weight:700;font-size:15px}
-.copy-button:hover{border-color:var(--gold)}
-.timer-text{color:var(--muted);text-align:center;font-size:14px;margin-top:10px}
-#result{margin-top:20px;text-align:center}
-#result h3{font-size:18px}
-#message{margin-top:16px;text-align:center;font-size:15px;min-height:22px;color:var(--muted)}
-#message.success{color:var(--green);font-weight:700}
-#message.error{color:var(--red);font-weight:700}
-
-/* المميزات */
-.features-section{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.feature-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px;transition:.2s}
-.feature-card:hover{border-color:var(--purple);transform:translateY(-3px)}
-.feature-card h3{color:var(--gold);font-size:18px;margin-bottom:8px}
-.feature-card p{color:var(--muted);font-size:14px;line-height:1.7}
+/* الكود والعداد */
+.ring{position:relative;width:150px;height:150px;margin:8px auto 12px}
+.ring svg{transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font:900 40px Arial,sans-serif}
+.code{direction:ltr;text-align:center;font:900 32px Arial,sans-serif;letter-spacing:6px;padding:16px;border-radius:16px;background:var(--card2);border:2px solid var(--gold);color:var(--gold);margin-bottom:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
 /* لوحة المطور */
-.dashboard-title{font-size:20px;font-weight:900;margin:24px 0 16px}
-.admin-tools{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-.admin-form{background:var(--card2);border:1px solid var(--border);border-radius:18px;padding:18px}
-.admin-form h3{color:var(--gold);font-size:16px;margin-bottom:4px}
-.admin-form button{padding:12px;border-radius:12px;border:0;cursor:pointer;background:linear-gradient(90deg,var(--gold),var(--purple));color:#17081f;font-weight:900}
-.logout-button{margin-top:20px;width:100%;padding:14px;border-radius:14px;cursor:pointer;background:transparent;border:1px solid var(--red);color:var(--red);font-weight:700}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.stat{background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center}
+.stat small{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+.stat strong{color:var(--gold);font-size:22px;font-weight:900}
+.list{max-height:240px;overflow:auto;margin-top:10px}
+.item{display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--border);direction:ltr;font-size:14px}
+.item em{font-style:normal;color:var(--muted)}
+.item .bn{color:var(--red)}
 
-/* الدعم والفوتر */
-.support-section{text-align:center}
-.support-section h2{font-size:24px;font-weight:900;margin-bottom:8px}
-.support-section p{color:var(--muted);margin-bottom:20px}
-.footer{text-align:center;color:var(--muted);padding:24px 0 8px;font-size:13px;line-height:1.9}
-.footer h3{color:var(--text);font-size:16px}
-
-/* الموبايل */
-@media (max-width:900px){
-  .menu-toggle{display:block}
-  .top-status{display:none}
-  .sidebar{position:fixed;top:64px;right:-280px;bottom:0;height:auto;z-index:40;width:260px;transition:right .3s ease;box-shadow:-10px 0 40px rgba(0,0,0,.5)}
-  .sidebar.sidebar-open{right:0}
-  .hero-section{flex-direction:column;text-align:center;padding:24px}
-  .main-title{font-size:42px}
-  .character-ring{width:160px;height:160px}
-  .character-ring .big-logo{font-size:90px}
-  .stats-section{grid-template-columns:repeat(2,1fr)}
-  .features-section{grid-template-columns:1fr}
-  .admin-tools{grid-template-columns:1fr}
-}
-@media (max-width:480px){
-  .main-content{padding:16px}
-  .panel{padding:20px}
-  .section-heading h2{font-size:20px}
-  .pair-code{font-size:26px;letter-spacing:4px}
-  .stat-card strong{font-size:26px}
-}
+/* زر الأغاني العائم */
+.fab{position:fixed;left:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));width:54px;height:54px;border-radius:50%;border:0;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--purple));font-size:24px;box-shadow:0 8px 24px rgba(139,92,246,.5);z-index:20}
+.fab.playing{animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 8px 24px rgba(139,92,246,.5)}50%{box-shadow:0 0 0 10px rgba(139,92,246,0)}}
+.song{display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px;margin-top:8px;border-radius:14px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;cursor:pointer;font-weight:700}
+.song.on{border-color:var(--gold);color:var(--gold)}
+.now{text-align:center;color:var(--muted);font-size:14px;margin-top:12px;min-height:20px}
 </style>
 </head>
 <body>
 
-<div class="background-effects">
-  <div class="glow glow-one"></div>
-  <div class="glow glow-two"></div>
-</div>
+<!-- شاشة الترحيب -->
+<main class="welcome">
+  <div class="logo">R</div>
+  <h1>مرحبا بك في <span>RICO BOT</span></h1>
+  <p>منصتك لتنصيب وتشغيل بوت واتساب بسهولة</p>
+  <button class="btn" id="openInstall">تنصيب</button>
+  <button class="btn ghost" id="openDev" style="margin-top:12px">لوحة المطور</button>
+</main>
 
-<header class="topbar">
-  <a href="#home" class="brand">
-    <div class="logo">R</div>
-    <span>RICO BOT</span>
-  </a>
-  <div class="top-status"><span class="status-dot"></span>منصة ريكو بوت</div>
-  <button class="menu-toggle" id="menuToggle" aria-label="القائمة">☰</button>
-</header>
+<!-- نافذة التنصيب -->
+<div class="modal" id="installModal" hidden>
+  <div class="sheet">
+    <button class="close" data-close>✕</button>
+    <h2>تنصيب البوت</h2>
+    <p class="sub">ادخل رقمك مع مفتاح الدولة</p>
 
-<div class="app-layout">
+    <input type="tel" id="phone" placeholder="249×××××××" autocomplete="tel" inputmode="numeric">
+    <div class="country" id="country"></div>
+    <button class="btn" id="pairBtn">تنصيب الرقم</button>
 
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo">R</div>
-      <h2>RICO BOT</h2>
-      <p>PREMIUM SYSTEM</p>
-      <span class="online-label">● ONLINE</span>
+    <div id="codeBox" hidden>
+      <div class="ring">
+        <svg width="150" height="150"><circle cx="75" cy="75" r="66" fill="none" stroke="var(--card2)" stroke-width="10"/><circle id="arc" cx="75" cy="75" r="66" fill="none" stroke="var(--gold)" stroke-width="10" stroke-linecap="round" stroke-dasharray="414.7" stroke-dashoffset="0"/></svg>
+        <b id="secs">60</b>
+      </div>
+      <div class="code" id="code"></div>
+      <div class="row2">
+        <button class="btn" id="copyBtn">نسخ الكود</button>
+        <button class="btn ghost" id="newCodeBtn">طلب كود جديد</button>
+      </div>
     </div>
 
-    <nav class="side-nav">
-      <a href="#home" class="nav-link active">الرئيسية</a>
-      <a href="#install" class="nav-link">تنصيب البوت</a>
-      <a href="#status" class="nav-link">حالة البوت</a>
-      <a href="#developer" class="nav-link">لوحة المطور</a>
-      <a href="https://whatsapp.com/channel/0029VbE0UbjKwqSYg0WUxu42" target="_blank" rel="noopener" class="nav-link">قناة الواتساب</a>
-      <a href="#support" class="nav-link">الدعم والمساعدة</a>
-    </nav>
-
-    <div class="sidebar-footer">
-      <h3>RICO BOT</h3>
-      <p>POWERED BY RICO TEAM</p>
-    </div>
-  </aside>
-
-  <main class="main-content">
-
-    <section class="hero-section" id="home">
-      <div class="hero-character">
-        <div class="character-ring">
-          <div class="big-logo">R</div>
-        </div>
-      </div>
-      <div class="hero-content">
-        <span class="hero-tag">PREMIUM WHATSAPP SYSTEM</span>
-        <h1 class="main-title">RICO BOT</h1>
-        <h2>مرحباً بك في ريكو بوت</h2>
-        <p>منصتك الذكية لتنصيب وتشغيل بوت واتساب وإدارة حسابك بسهولة.</p>
-        <a href="#install" class="main-button">تنصيب البوت <span>↗</span></a>
-      </div>
-    </section>
-
-    <section class="stats-section" id="status">
-      <div class="stat-card"><span>المستخدمون</span><strong id="usersCount">--</strong></div>
-      <div class="stat-card"><span>الاتصالات</span><strong id="connectionsCount">--</strong></div>
-      <div class="stat-card"><span>الاتصالات الفاشلة</span><strong id="failedCount">--</strong></div>
-      <div class="stat-card"><span>حد التنصيب</span><strong id="limitCount">--</strong></div>
-    </section>
-
-    <section class="panel" id="install">
-      <div class="section-heading">
-        <span class="section-icon">01</span>
-        <div>
-          <h2>تنصيب البوت</h2>
-          <p>اربط حساب واتساب الخاص بك</p>
-        </div>
-      </div>
-
-      <form id="pairForm">
-        <label for="country">الدولة</label>
-        <select id="country" required>
-          <option value="249">🇸🇩 السودان (+249)</option>
-          <option value="20">🇪🇬 مصر (+20)</option>
-          <option value="966">🇸🇦 السعودية (+966)</option>
-          <option value="971">🇦🇪 الإمارات (+971)</option>
-          <option value="964">🇮🇶 العراق (+964)</option>
-          <option value="962">🇯🇴 الأردن (+962)</option>
-          <option value="965">🇰🇼 الكويت (+965)</option>
-          <option value="974">🇶🇦 قطر (+974)</option>
-          <option value="973">🇧🇭 البحرين (+973)</option>
-          <option value="968">🇴🇲 عُمان (+968)</option>
-          <option value="967">🇾🇪 اليمن (+967)</option>
-          <option value="961">🇱🇧 لبنان (+961)</option>
-          <option value="963">🇸🇾 سوريا (+963)</option>
-          <option value="212">🇲🇦 المغرب (+212)</option>
-          <option value="213">🇩🇿 الجزائر (+213)</option>
-          <option value="216">🇹🇳 تونس (+216)</option>
-          <option value="218">🇱🇾 ليبيا (+218)</option>
-          <option value="222">🇲🇷 موريتانيا (+222)</option>
-          <option value="252">🇸🇴 الصومال (+252)</option>
-          <option value="253">🇩🇯 جيبوتي (+253)</option>
-          <option value="269">🇰🇲 جزر القمر (+269)</option>
-          <option value="970">🇵🇸 فلسطين (+970)</option>
-        </select>
-
-        <label for="phone">رقم واتساب</label>
-        <input type="tel" id="phone" placeholder="أدخل رقم الهاتف بدون رمز الدولة" autocomplete="tel" required>
-
-        <button type="submit" id="pairButton" class="main-button">تنصيب البوت <span>↗</span></button>
-      </form>
-
-      <div id="result" hidden>
-        <h3>رمز الاقتران</h3>
-        <div class="pair-code" id="pairCode"></div>
-        <button type="button" id="copyCode" class="copy-button">نسخ الرمز</button>
-        <p class="timer-text" id="timer"></p>
-      </div>
-
-      <p id="message" role="status" aria-live="polite"></p>
-    </section>
-
-    <section class="features-section">
-      <div class="feature-card"><h3>حماية الحساب</h3><p>إدارة الاتصال والجلسات</p></div>
-      <div class="feature-card"><h3>سرعة التشغيل</h3><p>واجهة سهلة وسريعة</p></div>
-      <div class="feature-card"><h3>إدارة النظام</h3><p>تحكم مركزي بالمنصة</p></div>
-    </section>
-
-    <section class="panel" id="developer">
-      <div class="section-heading">
-        <span class="section-icon">02</span>
-        <div>
-          <h2>لوحة المطور</h2>
-          <p>إدارة وتحكم في المنصة</p>
-        </div>
-      </div>
-
-      <form id="developerLogin">
-        <label for="adminPassword">رمز دخول المطور</label>
-        <input type="password" id="adminPassword" placeholder="أدخل رمز الدخول" autocomplete="current-password" required>
-        <button type="submit" class="main-button">دخول لوحة المطور</button>
-      </form>
-
-      <div id="developerDashboard" hidden>
-        <h3 class="dashboard-title">إدارة المنصة</h3>
-        <div class="admin-tools">
-          <form id="limitForm" class="admin-form">
-            <h3>حد التنصيب</h3>
-            <input type="number" id="newLimit" placeholder="الحد الجديد" min="1" required>
-            <button type="submit">تحديث الحد</button>
-          </form>
-
-          <form id="banForm" class="admin-form">
-            <h3>حظر مستخدم</h3>
-            <input type="tel" id="banPhone" placeholder="رقم المستخدم" required>
-            <button type="submit">حظر</button>
-          </form>
-
-          <form id="unbanForm" class="admin-form">
-            <h3>إلغاء الحظر</h3>
-            <input type="tel" id="unbanPhone" placeholder="رقم المستخدم" required>
-            <button type="submit">إلغاء الحظر</button>
-          </form>
-
-          <form id="announcementForm" class="admin-form">
-            <h3>إرسال إعلان</h3>
-            <textarea id="announcement" placeholder="اكتب الإعلان هنا" required></textarea>
-            <button type="submit">نشر الإعلان</button>
-          </form>
-        </div>
-
-        <button type="button" id="developerLogout" class="logout-button">تسجيل الخروج</button>
-      </div>
-    </section>
-
-    <section class="panel support-section" id="support">
-      <h2>الدعم والمساعدة</h2>
-      <p>تابع آخر أخبار وتحديثات RICO BOT.</p>
-      <a href="https://whatsapp.com/channel/0029VbE0UbjKwqSYg0WUxu42" target="_blank" rel="noopener" class="main-button">قناة RICO BOT</a>
-    </section>
-
-    <footer class="footer">
-      <h3>RICO BOT</h3>
-      <p>PREMIUM EDITION</p>
-      <p>POWERED BY RICO TEAM</p>
-    </footer>
-
-  </main>
+    <div class="msg" id="msg" role="status"></div>
+  </div>
 </div>
+
+<!-- نافذة لوحة المطور -->
+<div class="modal" id="devModal" hidden>
+  <div class="sheet">
+    <button class="close" data-close>✕</button>
+    <h2 class="title">لوحة المطور</h2>
+
+    <div id="devLogin">
+      <p class="sub">ادخل كود التفعيل</p>
+      <input type="password" id="devPass" placeholder="كود التفعيل" style="font-size:16px;letter-spacing:0">
+      <div style="height:12px"></div>
+      <button class="btn" id="devLoginBtn">دخول</button>
+    </div>
+
+    <div id="devDash" hidden>
+      <div class="stats">
+        <div class="stat"><small>المستخدمون</small><strong id="sUsers">0</strong></div>
+        <div class="stat"><small>متصل الآن</small><strong id="sOn">0</strong></div>
+        <div class="stat"><small>الاتصالات</small><strong id="sConn">0</strong></div>
+        <div class="stat"><small>الفاشلة</small><strong id="sFail">0</strong></div>
+      </div>
+      <div class="sub" style="margin:0">الحد الحالي: <b id="sLimit" style="color:var(--gold)">0</b></div>
+      <div class="list" id="numList"></div>
+      <div style="height:12px"></div>
+      <button class="btn ghost" id="devRefresh">تحديث</button>
+    </div>
+
+    <div class="msg" id="devMsg" role="status"></div>
+  </div>
+</div>
+
+<!-- زر الأغاني -->
+<button class="fab" id="musicBtn" aria-label="الأغاني">🎵</button>
+
+<div class="modal" id="musicModal" hidden>
+  <div class="sheet">
+    <button class="close" data-close>✕</button>
+    <h2>الأغاني</h2>
+    <p class="sub">اختار أغنية. الأغنية 7 بتشتغل أول ما تدخل المنصة.</p>
+    <div id="songs"></div>
+    <div class="now" id="now"></div>
+  </div>
+</div>
+
+<audio id="player" preload="none"></audio>
 
 <script>
-/* القائمة الجانبية */
-const menuToggle = document.getElementById("menuToggle");
-const sidebar = document.getElementById("sidebar");
-menuToggle.addEventListener("click", () => sidebar.classList.toggle("sidebar-open"));
-document.querySelectorAll(".nav-link").forEach(l => l.addEventListener("click", () => sidebar.classList.remove("sidebar-open")));
-
-/* أدوات عامة */
 const $ = id => document.getElementById(id);
-const messageBox = $("message");
-const pairForm = $("pairForm");
-const country = $("country");
-const phoneInput = $("phone");
-const pairButton = $("pairButton");
-const result = $("result");
-const pairCode = $("pairCode");
-const copyCode = $("copyCode");
-const timerText = $("timer");
-const developerLogin = $("developerLogin");
-const adminPassword = $("adminPassword");
-const developerDashboard = $("developerDashboard");
-const developerLogout = $("developerLogout");
 
-let countdown = null;
-let statusPoll = null;
-
-function setMessage(text, type = "info") {
-  messageBox.textContent = text;
-  messageBox.className = type;
-}
+/* ===== أدوات ===== */
+const PREFIXES = {
+  "249":"السودان","20":"مصر","966":"السعودية","971":"الإمارات","964":"العراق","962":"الأردن",
+  "965":"الكويت","974":"قطر","973":"البحرين","968":"عُمان","967":"اليمن","961":"لبنان","963":"سوريا",
+  "212":"المغرب","213":"الجزائر","216":"تونس","218":"ليبيا","222":"موريتانيا","252":"الصومال",
+  "253":"جيبوتي","269":"جزر القمر","970":"فلسطين"
+};
 
 async function api(url, body) {
   const res = await fetch(url, {
@@ -363,178 +169,203 @@ async function api(url, body) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.success === false) {
-    const err = new Error(data.message || "صار خطأ في السيرفر");
-    err.status = res.status;
-    throw err;
+    const e = new Error(data.message || "صار خطأ في السيرفر");
+    e.status = res.status;
+    throw e;
   }
   return data;
 }
 
-function fillStats(s) {
-  $("usersCount").textContent = s.users ?? "--";
-  $("connectionsCount").textContent = s.connections ?? "--";
-  $("failedCount").textContent = s.failed ?? "--";
-  $("limitCount").textContent = s.limit ?? "--";
+function openModal(id) { $(id).hidden = false; }
+function closeModal(id) { $(id).hidden = true; }
+document.querySelectorAll("[data-close]").forEach(b =>
+  b.addEventListener("click", () => b.closest(".modal").hidden = true)
+);
+document.querySelectorAll(".modal").forEach(m =>
+  m.addEventListener("click", e => { if (e.target === m) m.hidden = true; })
+);
+
+/* ===== التنصيب ===== */
+let timer = null, poll = null;
+
+function digits(v) { return String(v || "").replace(/\D/g, ""); }
+
+function countryName(v) {
+  for (const len of [3, 2, 1]) {
+    const name = PREFIXES[v.slice(0, len)];
+    if (name) return name;
+  }
+  return "";
 }
 
-async function loadPublicStats() {
-  try { fillStats(await api("/api/stats")); } catch {}
+$("phone").addEventListener("input", e => {
+  const v = digits(e.target.value);
+  e.target.value = v;
+  $("country").textContent = countryName(v);
+});
+
+function setMsg(text, type = "") {
+  $("msg").textContent = text;
+  $("msg").className = "msg " + type;
 }
 
-/* التنصيب */
-function startCountdown(seconds) {
-  clearInterval(countdown);
-  let left = seconds;
-  timerText.textContent = `ينتهي الرمز بعد ${left} ثانية`;
-  countdown = setInterval(() => {
-    left--;
-    if (left <= 0) {
-      clearInterval(countdown);
-      timerText.textContent = "انتهت صلاحية الرمز، اضغط تنصيب البوت مرة ثانية";
+function startTimer(seconds) {
+  clearInterval(timer);
+  const arc = $("arc"), L = 414.7;
+  let s = seconds;
+  const tick = () => {
+    $("secs").textContent = s;
+    arc.style.strokeDashoffset = L * (1 - s / seconds);
+  };
+  tick();
+  timer = setInterval(() => {
+    s--;
+    if (s <= 0) {
+      clearInterval(timer);
+      $("secs").textContent = "0";
+      setMsg("انتهى الكود. اضغط طلب كود جديد", "err");
       return;
     }
-    timerText.textContent = `ينتهي الرمز بعد ${left} ثانية`;
+    tick();
   }, 1000);
 }
 
-function watchConnection(phone) {
-  clearInterval(statusPoll);
+function watch(phone) {
+  clearInterval(poll);
   let tries = 0;
-  statusPoll = setInterval(async () => {
-    tries++;
-    if (tries > 60) return clearInterval(statusPoll);
+  poll = setInterval(async () => {
+    if (++tries > 60) return clearInterval(poll);
     try {
       const s = await api("/api/pair/status?phone=" + phone);
       if (s.status === "connected") {
-        clearInterval(statusPoll);
-        clearInterval(countdown);
-        timerText.textContent = "";
-        setMessage("تم ربط البوت بنجاح ✓", "success");
-        loadPublicStats();
+        clearInterval(poll);
+        clearInterval(timer);
+        setMsg("تم ربط البوت بنجاح ✓", "ok");
       }
     } catch {}
   }, 3000);
 }
 
-pairForm.addEventListener("submit", async e => {
-  e.preventDefault();
-  const local = phoneInput.value.replace(/\D/g, "").replace(/^0+/, "");
-  const phone = country.value + local;
-
-  if (local.length < 6) return setMessage("ادخل رقم الهاتف بدون رمز الدولة", "error");
-
-  pairButton.disabled = true;
-  result.hidden = true;
-  setMessage("جاري طلب رمز الاقتران…");
+async function requestCode() {
+  const phone = digits($("phone").value);
+  if (phone.length < 8 || phone.length > 15) {
+    return setMsg("ادخل الرقم كامل مع مفتاح الدولة", "err");
+  }
+  $("pairBtn").disabled = true;
+  $("newCodeBtn").disabled = true;
+  setMsg("جاري طلب الكود…");
 
   try {
-    const data = await api("/api/pair", { phone });
-    pairCode.textContent = data.code;
-    result.hidden = false;
-    setMessage(data.message || "أدخل الرمز في واتساب", "success");
-    startCountdown(data.expiresIn || 60);
-    watchConnection(phone);
-  } catch (err) {
-    setMessage(err.message, "error");
+    const d = await api("/api/pair", { phone });
+    $("code").textContent = d.code;
+    $("codeBox").hidden = false;
+    setMsg("ادخل الكود في واتساب من الأجهزة المرتبطة", "ok");
+    startTimer(d.expiresIn || 60);
+    watch(phone);
+  } catch (e) {
+    setMsg(e.message, "err");
   } finally {
-    pairButton.disabled = false;
+    $("pairBtn").disabled = false;
+    $("newCodeBtn").disabled = false;
   }
-});
+}
 
-copyCode.addEventListener("click", async () => {
+$("openInstall").addEventListener("click", () => openModal("installModal"));
+$("pairBtn").addEventListener("click", requestCode);
+$("newCodeBtn").addEventListener("click", requestCode);
+$("copyBtn").addEventListener("click", async () => {
   try {
-    await navigator.clipboard.writeText(pairCode.textContent);
-    copyCode.textContent = "تم النسخ ✓";
-    setTimeout(() => (copyCode.textContent = "نسخ الرمز"), 2000);
+    await navigator.clipboard.writeText($("code").textContent);
+    setMsg("اتنسخ الكود ✓", "ok");
   } catch {
-    setMessage("انسخ الرمز يدوياً: " + pairCode.textContent, "info");
+    setMsg("انسخ الكود يدوياً: " + $("code").textContent);
   }
 });
 
-/* لوحة المطور */
-async function loadDeveloperStats() {
+/* ===== لوحة المطور ===== */
+$("openDev").addEventListener("click", () => {
+  openModal("devModal");
+  loadDev();
+});
+
+async function loadDev() {
   try {
-    fillStats(await api("/api/developer/stats"));
-  } catch (err) {
-    if (err.status === 401) showLogin();
+    const s = await api("/api/developer/stats");
+    $("devLogin").hidden = true;
+    $("devDash").hidden = false;
+    $("sUsers").textContent = s.users;
+    $("sOn").textContent = s.connected;
+    $("sConn").textContent = s.connections;
+    $("sFail").textContent = s.failed;
+    $("sLimit").textContent = s.limit;
+
+    const nums = await api("/api/developer/numbers");
+    $("numList").innerHTML = nums.length
+      ? nums.map(n => `<div class="item"><span>${n.number}${n.banned ? ' <b class="bn">محظور</b>' : ""}</span><em>${n.status}</em></div>`).join("")
+      : '<p class="sub" style="text-align:center">ما في أرقام منصبة لسه</p>';
+  } catch (e) {
+    if (e.status === 401) {
+      $("devLogin").hidden = false;
+      $("devDash").hidden = true;
+    } else {
+      $("devMsg").textContent = e.message;
+    }
   }
 }
 
-function showDashboard() {
-  developerLogin.hidden = true;
-  developerDashboard.hidden = false;
-  loadDeveloperStats();
-}
-
-function showLogin() {
-  developerLogin.hidden = false;
-  developerDashboard.hidden = true;
-}
-
-developerLogin.addEventListener("submit", async e => {
-  e.preventDefault();
+$("devLoginBtn").addEventListener("click", async () => {
   try {
-    await api("/api/developer/login", { password: adminPassword.value });
-    adminPassword.value = "";
-    showDashboard();
-  } catch (err) {
-    alert(err.message);
+    await api("/api/developer/login", { password: $("devPass").value });
+    $("devPass").value = "";
+    $("devMsg").textContent = "";
+    loadDev();
+  } catch (e) {
+    $("devMsg").textContent = e.message;
   }
 });
+$("devRefresh").addEventListener("click", loadDev);
 
-developerLogout.addEventListener("click", async () => {
-  try { await api("/api/developer/logout", {}); } catch {}
-  showLogin();
+/* ===== الأغاني ===== */
+const SONGS = [1, 2, 3, 4, 5, 6, 7].map(n => ({ id: n, title: "الأغنية " + n, file: `songs/${n}.mp3` }));
+const player = $("player");
+let current = null;
+
+function playSong(id) {
+  const s = SONGS.find(x => x.id === id);
+  if (!s) return;
+  current = id;
+  player.src = s.file;
+  player.play().then(() => {
+    $("musicBtn").classList.add("playing");
+    $("now").textContent = "تشغيل: " + s.title;
+  }).catch(() => {
+    $("now").textContent = "ما قدرت أشغل " + s.title + "، تأكد من ملف الأغنية";
+  });
+  document.querySelectorAll(".song").forEach(b => b.classList.toggle("on", Number(b.dataset.id) === id));
+}
+
+function renderSongs() {
+  $("songs").innerHTML = SONGS.map(s =>
+    `<button class="song" data-id="${s.id}"><span>${s.title}</span><span>▶</span></button>`
+  ).join("");
+  document.querySelectorAll(".song").forEach(b =>
+    b.addEventListener("click", () => playSong(Number(b.dataset.id)))
+  );
+}
+
+player.addEventListener("pause", () => $("musicBtn").classList.remove("playing"));
+player.addEventListener("play", () => $("musicBtn").classList.add("playing"));
+
+$("musicBtn").addEventListener("click", () => {
+  renderSongs();
+  openModal("musicModal");
 });
 
-$("limitForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  try {
-    const d = await api("/api/developer/limit", { limit: Number($("newLimit").value) });
-    alert("تم تحديث الحد إلى " + d.limit);
-    $("newLimit").value = "";
-    loadDeveloperStats();
-  } catch (err) { alert(err.message); }
-});
-
-$("banForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  try {
-    await api("/api/developer/ban", { phone: $("banPhone").value });
-    alert("تم حظر الرقم");
-    $("banPhone").value = "";
-  } catch (err) { alert(err.message); }
-});
-
-$("unbanForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  try {
-    await api("/api/developer/unban", { phone: $("unbanPhone").value });
-    alert("تم إلغاء الحظر");
-    $("unbanPhone").value = "";
-  } catch (err) { alert(err.message); }
-});
-
-$("announcementForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  try {
-    const d = await api("/api/developer/announce", { announcement: $("announcement").value });
-    alert("تم إرسال الإعلان لـ " + (d.sent ?? 0) + " رقم");
-    $("announcement").value = "";
-  } catch (err) { alert(err.message); }
-});
-
-/* البداية */
-(async () => {
-  loadPublicStats();
-  try {
-    await api("/api/developer/stats");
-    showDashboard();
-  } catch {
-    showLogin();
-  }
-})();
+// المتصفحات بتمنع التشغيل التلقائي، فالأغنية 7 بتبدأ أول ضغطة في الصفحة
+document.addEventListener("click", () => {
+  if (current === null) playSong(7);
+}, { once: true });
 </script>
 
 </body>
-  </html>
+      </html>
