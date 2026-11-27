@@ -92,7 +92,54 @@ function isSecure(req) {
 
 /* ================= الإضافات (plugins) ================= */
 
-// إضافات مدمجة: رد السلام وأوامر الأدمن
+const CATEGORY_NAMES = {
+  admins: "الإدارة",
+  games: "الألعاب",
+  group: "الجروبات",
+  download: "التحميل",
+  tools: "الأدوات",
+  ai: "الذكاء الاصطناعي",
+  fun: "المرح",
+  owner: "المطور",
+  other: "أخرى"
+};
+
+const menuPlugin = {
+  name: "menu",
+  category: "other",
+  commands: ["اوامر", "menu", "قائمة"],
+  run: async ctx => {
+    const sections = buildSections();
+    if (!sections.length) return ctx.reply("ما في أوامر محملة حالياً.");
+
+    const arg = ctx.args[0];
+    const line = "── ⋅ ⋅ ── 🪻 ── ⋅ ⋅ ──";
+
+    if (!arg) {
+      const list = sections
+        .map((s, i) => `⦑ ${i + 1} ⦒ ⦂ ${s.title} (${s.cmds.length})`)
+        .join("\n");
+      return ctx.reply(
+        `*⪩ مرحبا بك في ريكو بوت ↯ •*\n${line}\n\n` +
+        `*『 اختر قسم من الأقسام الآتية 』*\n\n${list}\n\n${line}\n` +
+        `اكتب .اوامر ورقم القسم، مثال: .اوامر 1`
+      );
+    }
+
+    const sec = sections[Number(arg) - 1] || sections.find(s => s.key === arg || s.title === arg);
+    if (!sec) return ctx.reply("القسم ده مش موجود، اكتب .اوامر عشان تشوف الأقسام.");
+
+    const list = sec.cmds
+      .map((c, i) => `⦑ ${i + 1} ⦒ ⦂ .${c.name}${c.admin ? " 🔒" : ""}`)
+      .join("\n");
+    return ctx.reply(
+      `*⪩ ${sec.title} ↯ •*\n${line}\n\n${list}\n\n${line}\n` +
+      `🔒 = للأدمن بس`
+    );
+  }
+};
+
+// إضافات مدمجة: رد السلام، القائمة، وأوامر الأدمن
 const builtinPlugins = [
   {
     name: "greeting",
@@ -101,9 +148,11 @@ const builtinPlugins = [
       await ctx.reply("وعليكم السلام ورحمة الله 👋");
     }
   },
+  menuPlugin,
   {
     name: "admin-stats",
     admin: true,
+    category: "owner",
     commands: ["stats"],
     run: async ctx => {
       await ctx.reply(`الأرقام المتصلة: ${connectedCount()}\nالحد الأقصى: ${effectiveLimit()}`);
@@ -112,6 +161,7 @@ const builtinPlugins = [
   {
     name: "admin-maintenance",
     admin: true,
+    category: "owner",
     commands: ["maintenance"],
     run: async ctx => {
       db.maintenance = !db.maintenance;
@@ -159,7 +209,9 @@ async function loadPlugins() {
             file: full,
             legacy: true,
             handler: p,
-            command: p.command,
+            command: [].concat(p.command || []).map(c => String(c).toLowerCase()),
+            usage: [].concat(p.usage || p.command || []).map(String),
+            category: p.category || "other",
             admin: p.admin,
             group: p.group
           });
@@ -168,10 +220,33 @@ async function loadPlugins() {
         }
       }
     } catch (e) {
-      console.error("PLUGIN LOAD ERROR", full, e.message);
+      console.error("PLUGIN LOAD ERROR", path.basename(full), e.message);
     }
   }
-  console.log("PLUGINS LOADED", plugins.length);
+
+  const names = plugins.filter(p => p.legacy).flatMap(p => p.command);
+  console.log("PLUGINS LOADED", plugins.length, "| LEGACY COMMANDS:", names.length);
+  console.log("COMMANDS:", names.join(", "));
+}
+
+// يبني الأقسام للقائمة من الملفات نفسها
+function buildSections() {
+  const map = new Map();
+  for (const p of plugins) {
+    const names = p.legacy ? p.usage : (p.commands || []);
+    if (!names || !names.length) continue;
+    const key = p.category || "other";
+    if (!map.has(key)) map.set(key, []);
+    const list = map.get(key);
+    for (const name of names) {
+      if (!list.some(c => c.name === name)) list.push({ name, admin: !!p.admin });
+    }
+  }
+  return [...map.entries()].map(([key, cmds]) => ({
+    key,
+    title: CATEGORY_NAMES[key] || key,
+    cmds
+  }));
 }
 
 // هل الرقم أدمن في الجروب؟
@@ -204,24 +279,35 @@ function getMessageText(m) {
 async function handleIncoming(sock, { messages, type }) {
   if (type !== "notify") return;
 
-  for (const m of messages) {
-    if (m.key.fromMe) continue;
+  const myNumber = cleanPhone(sock.user?.id?.split(":")[0]?.split("@")[0]);
 
+  for (const m of messages) {
     const jid = m.key.remoteJid;
     if (!jid || jid === "status@broadcast") continue;
 
-    const sender = cleanPhone(m.key.participant || jid);
+    const isGroup = jid.endsWith("@g.us");
+
+    // الرسائل اللي بعتها بنفسك: نقبل بس "الرسائل المحفوظة"، ونتجاهل ردود البوت نفسه
+    if (m.key.fromMe) {
+      const isSelfChat = !isGroup && (cleanPhone(jid) === myNumber || jid === sock.user?.lid);
+      if (!isSelfChat || sock.sentIds.has(m.key.id)) continue;
+    }
+
+    const sender = m.key.fromMe ? myNumber : cleanPhone(m.key.participant || jid);
     if (isBanned(sender)) continue;
 
     const text = getMessageText(m);
     if (!text) continue;
 
-    const isGroup = jid.endsWith("@g.us");
-    const isAdmin = ADMIN_NUMBERS.includes(sender);
+    // صاحب الرقم والأرقام في RICO_ADMIN_NUMBERS أدمن
+    const isAdmin = m.key.fromMe || ADMIN_NUMBERS.includes(sender);
+
     const firstWord = text.split(/\s+/)[0];
-    const isCommand = firstWord.startsWith(".") || firstWord.startsWith("!");
-    const cmdName = isCommand ? firstWord.slice(1).toLowerCase() : "";
+    const hasPrefix = /^[.!\/#]/.test(firstWord);
+    const cmdName = firstWord.replace(/^[.!\/#]/, "").toLowerCase();
     const args = text.split(/\s+/).slice(1);
+
+    if (hasPrefix) recordCommand(cmdName);
 
     const reply = t => sock.sendMessage(jid, { text: t }, { quoted: m });
     const ctx = { sock, jid, msg: m, text, sender, args, isAdmin, reply };
@@ -239,8 +325,7 @@ async function handleIncoming(sock, { messages, type }) {
 
     for (const plugin of plugins) {
       if (plugin.legacy) {
-        const names = [].concat(plugin.command || []);
-        if (!isCommand || !names.includes(cmdName)) continue;
+        if (!plugin.command.includes(cmdName)) continue;
         if (plugin.group && !isGroup) continue;
         if (plugin.admin && !isAdmin) {
           const groupAdmin = isGroup && (await isGroupAdmin(sock, jid, sender));
@@ -251,10 +336,11 @@ async function handleIncoming(sock, { messages, type }) {
             conn: sock,
             command: cmdName,
             args,
-            usedPrefix: firstWord[0]
+            usedPrefix: hasPrefix ? firstWord[0] : ""
           });
         } catch (e) {
-          console.error("PLUGIN RUN ERROR", plugin.file, e.message);
+          console.error("PLUGIN RUN ERROR", path.basename(plugin.file), e.message);
+          await reply("حصل خطأ في تنفيذ الأمر، جرب تاني.").catch(() => {});
         }
         break;
       }
@@ -265,14 +351,14 @@ async function handleIncoming(sock, { messages, type }) {
       if (typeof plugin.match === "function") {
         matched = !!plugin.match(text, ctx);
       } else if (Array.isArray(plugin.commands)) {
-        matched = isCommand && plugin.commands.includes(cmdName);
+        matched = plugin.commands.includes(cmdName);
       }
       if (!matched) continue;
 
       try {
         await plugin.run(ctx);
       } catch (e) {
-        console.error("PLUGIN RUN ERROR", plugin.name || plugin.file, e.message);
+        console.error("PLUGIN RUN ERROR", plugin.name, e.message);
       }
       break;
     }
@@ -295,6 +381,18 @@ async function createSocket(phone) {
     syncFullHistory: false
   });
 
+  // نتتبع رسايل البوت عشان ما يرد على نفسه في الرسائل المحفوظة
+  sock.sentIds = new Set();
+  const rawSend = sock.sendMessage.bind(sock);
+  sock.sendMessage = async (jid, content, opts) => {
+    const sent = await rawSend(jid, content, opts);
+    if (sent?.key?.id) {
+      sock.sentIds.add(sent.key.id);
+      if (sock.sentIds.size > 500) sock.sentIds.delete(sock.sentIds.values().next().value);
+    }
+    return sent;
+  };
+
   // الفريمورك القديم بيستخدم buttonV2، ولو مش موجودة نرسل نص عادي
   if (!sock.buttonV2) {
     sock.buttonV2 = (jid, opts, extra) =>
@@ -302,17 +400,6 @@ async function createSocket(phone) {
   }
 
   sock.ev.on("creds.update", saveCreds);
-
-  sock.ev.on("messages.upsert", ev => {
-    if (ev.type !== "notify") return;
-    for (const m of ev.messages) {
-      if (m.key.fromMe) continue;
-      const text = m.message?.conversation || m.message?.extendedTextMessage?.text || "";
-      if (text.startsWith(".") || text.startsWith("!")) {
-        recordCommand(text.trim().split(/\s+/)[0].slice(1).toLowerCase());
-      }
-    }
-  });
 
   sock.ev.on("messages.upsert", ev => {
     handleIncoming(sock, ev).catch(e => console.error("HANDLER ERROR", e.message));
