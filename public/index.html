@@ -109,7 +109,11 @@ nav{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);width:min(500
 nav button{flex:1;background:none;border:0;color:var(--mut);font:inherit;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:16px;cursor:pointer;transition:.25s}
 nav button i{font-style:normal;font-size:20px}
 nav button.on{color:#fff;background:linear-gradient(135deg,#8b5cf655,#38bdf833);box-shadow:0 0 16px #8b5cf655}
-.foot{text-align:center;color:var(--mut);font-size:11px;letter-spacing:2px;margin-top:18px}
+.foot{text-align:center;color:var(--mut);font-size:11px;letter-spacing:2px;margin-top:18px;cursor:pointer}
+/* developer panel */
+.rowd{display:flex;gap:8px;flex-wrap:wrap}
+.rowd input{flex:1;min-width:120px}
+.rowd .btn{flex:1;width:auto;padding:12px}
 </style>
 </head>
 <body>
@@ -169,7 +173,7 @@ nav button.on{color:#fff;background:linear-gradient(135deg,#8b5cf655,#38bdf833);
     <div class="item" onclick="go('ai')"><div class="ic">🤖</div><div>الذكاء الاصطناعي<small>اسأل أي حاجة</small></div>›</div>
     <div class="item" onclick="go('games')"><div class="ic">🎮</div><div>الألعاب<small>XO وحجر ورقة مقص</small></div>›</div>
     <div class="item" onclick="go('support')"><div class="ic">🛟</div><div>الدعم<small>بنقرأ مشكلتك</small></div>›</div>
-    <div class="foot en">DEVELOPED BY RICO</div>
+    <div class="foot en" onclick="go('dev')">DEVELOPED BY RICO</div>
   </section>
 
   <!-- التنصيب -->
@@ -245,6 +249,74 @@ nav button.on{color:#fff;background:linear-gradient(135deg,#8b5cf655,#38bdf833);
     </div>
   </section>
 
+  <!-- لوحة المطور -->
+  <section class="page" id="dev">
+    <h2>لوحة المطور 🔐</h2>
+    <p class="sub">للمطور بس.</p>
+
+    <div id="devLogin" class="card">
+      <label>كود المطور</label>
+      <input id="devPass" type="password" placeholder="كود التفعيل">
+      <button class="btn" style="margin-top:12px" onclick="devLogin()">دخول</button>
+    </div>
+
+    <div id="devPanel" style="display:none">
+      <div class="stats">
+        <div class="stat"><b id="dUsers">0</b><span>أرقام</span></div>
+        <div class="stat"><b id="dConn">0</b><span>متصلين</span></div>
+        <div class="stat"><b id="dFail">0</b><span>فشل</span></div>
+      </div>
+
+      <div class="card">
+        <div id="dLimit" class="sub"></div>
+        <div class="rowd">
+          <input id="dLimitIn" type="number" min="1" placeholder="الحد الجديد">
+          <button class="btn" onclick="setLimit()">حفظ</button>
+        </div>
+        <div class="rowd" style="margin-top:10px">
+          <button class="btn ghost" onclick="adjust(-10)">-10</button>
+          <button class="btn ghost" onclick="adjust(10)">+10</button>
+          <button class="btn ghost" id="dMaint" onclick="toggleMaint()">الصيانة</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <label>حظر أو رفع حظر رقم</label>
+        <input id="dPhone" placeholder="الرقم بالصيغة الدولية">
+        <div class="rowd" style="margin-top:10px">
+          <button class="btn" onclick="banAct('ban')">حظر</button>
+          <button class="btn ghost" onclick="banAct('unban')">رفع الحظر</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <label>إعلان لكل الأرقام المتصلة</label>
+        <textarea id="dAnn" rows="3"></textarea>
+        <button class="btn" style="margin-top:10px" onclick="announce()">إرسال الإعلان</button>
+        <div class="sub" id="dAnnOk" style="margin:8px 0 0"></div>
+      </div>
+
+      <div class="card">
+        <label>أكتر الأوامر استخداماً</label>
+        <div class="rowd">
+          <button class="btn ghost" onclick="loadCmds('d')">يوم</button>
+          <button class="btn ghost" onclick="loadCmds('w')">أسبوع</button>
+          <button class="btn ghost" onclick="loadCmds('y')">سنة</button>
+        </div>
+        <div id="dCmds" class="sub" style="margin:10px 0 0"></div>
+      </div>
+
+      <div class="card">
+        <label>الأرقام المربوطة</label>
+        <button class="btn ghost" onclick="loadNumbers()">تحديث القائمة</button>
+        <div id="dNums" class="sub" style="margin-top:10px"></div>
+      </div>
+
+      <button class="btn ghost" onclick="devLogout()">تسجيل الخروج</button>
+      <div class="err" id="devErr"></div>
+    </div>
+  </section>
+
   <nav>
     <button data-p="support" onclick="go('support')"><i>🛟</i>الدعم</button>
     <button data-p="games" onclick="go('games')"><i>🎮</i>الألعاب</button>
@@ -256,7 +328,7 @@ nav button.on{color:#fff;background:linear-gradient(135deg,#8b5cf655,#38bdf833);
 
 <script>
 /* ضع رابط السيرفر هنا. لو فاضي بيشتغل وضع تجريبي (الكود وهمي للتجربة بس) */
-const API = ""; // مثال: "https://rico-bot-2mwv.onrender.com"
+const API = "https://rico-ai-5.onrender.com";
 
 const $ = id => document.getElementById(id);
 setTimeout(() => $('splash').classList.add('hide'), 2900);
@@ -272,7 +344,7 @@ function counters(){
     const to=+el.dataset.n;let n=0;
     const t=setInterval(()=>{n+=Math.ceil(to/25);if(n>=to){n=to;clearInterval(t)}el.textContent=n+(to===10?'s':'')},40);
   });
-  if(API) fetch(API+'/api/stats').then(r=>r.json()).then(d=>{ if(d.connected!=null) $('usersN').textContent=d.connected }).catch(()=>{});
+  if(API) fetch(API+'/api/stats').then(r=>r.json()).then(d=>{ if(d.users!=null) $('usersN').textContent=d.users }).catch(()=>{});
 }
 
 /* ===== التنصيب ===== */
@@ -288,7 +360,7 @@ async function install(){
     if(API){
       const r = await fetch(API+'/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number})});
       const d = await r.json();
-      if(!r.ok || !d.code) throw new Error(d.error || 'فشل توليد الكود');
+      if(!r.ok || !d.code) throw new Error(d.message || 'فشل توليد الكود');
       code = d.code;
     }else{
       await new Promise(r=>setTimeout(r,1500));
@@ -328,10 +400,20 @@ const KB=[
  [/ما شغال|مش شغال|خطأ|تعذر/,'تأكد إنك دخلت الكود في أقل من دقيقتين، والرقم من غير صفر. لو استمرت المشكلة ابعتها من صفحة الدعم.'],
  [/مجاني|سعر|فلوس/,'التنصيب مجاني ✨'],
 ];
-function ask(t){
+async function ask(t){
   const q=$('q'); const text=t||q.value.trim(); if(!text) return; q.value='';
   add(text,'me');
-  setTimeout(()=>{ const m=KB.find(k=>k[0].test(text)); add(m?m[1]:'سؤال حلو! لسه بتعلم، جرب صفحة الدعم لو محتاج مساعدة مباشرة.','bot') },500);
+  if(!API){ setTimeout(()=>{ const m=KB.find(k=>k[0].test(text)); add(m?m[1]:'جرب صفحة الدعم لو محتاج مساعدة.','bot') },400); return; }
+  add('...','bot');
+  try{
+    const r=await fetch(API+'/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const d=await r.json();
+    $('chat').lastChild.remove();
+    add(d.reply || d.message,'bot');
+  }catch(e){
+    $('chat').lastChild.remove();
+    add('تعذر الاتصال بالسيرفر','bot');
+  }
 }
 function add(t,w){ const d=document.createElement('div'); d.className='msg '+w; d.textContent=t; $('chat').appendChild(d); $('chat').scrollTop=1e9 }
 
@@ -366,6 +448,94 @@ async function sendSupport(){
   if(API) try{ await fetch(API+'/api/support',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({msg,contact:$('ct').value})}) }catch(e){}
   $('spOk').style.display='block'; $('sp').value='';
 }
+
+/* ===== لوحة المطور ===== */
+let maintOn = false;
+const B = API || '';
+
+async function dev(path, opts = {}){
+  const r = await fetch(B + path, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
+  const d = await r.json().catch(() => ({}));
+  if(r.status === 401){ showLogin(); throw new Error(d.message || 'سجل دخول من جديد'); }
+  if(!r.ok) throw new Error(d.message || 'فشل الطلب');
+  return d;
+}
+function showLogin(){ $('devLogin').style.display = 'block'; $('devPanel').style.display = 'none'; }
+function showPanel(){ $('devLogin').style.display = 'none'; $('devPanel').style.display = 'block'; }
+function devMsg(t){ $('devErr').textContent = t; }
+function fillList(el, rows){
+  el.innerHTML = '';
+  rows.forEach(r => { const d = document.createElement('div'); d.style.padding = '6px 0'; d.textContent = r; el.appendChild(d); });
+  if(!rows.length) el.textContent = 'ما فيش بيانات';
+}
+
+async function devLogin(){
+  devMsg('');
+  try{
+    await dev('/api/developer/login', { method: 'POST', body: JSON.stringify({ password: $('devPass').value }) });
+    $('devPass').value = '';
+    showPanel(); loadStats(); loadNumbers();
+  }catch(e){ devMsg(e.message); }
+}
+async function devLogout(){
+  try{ await dev('/api/developer/logout', { method: 'POST' }); }catch(e){}
+  showLogin();
+}
+async function loadStats(){
+  try{
+    const d = await dev('/api/developer/stats');
+    $('dUsers').textContent = d.users; $('dConn').textContent = d.connected; $('dFail').textContent = d.failed;
+    $('dLimit').textContent = 'الحد الحالي: ' + d.limit + ' — المحظورين: ' + d.banned;
+    maintOn = d.maintenance;
+    $('dMaint').textContent = maintOn ? 'إيقاف الصيانة' : 'تشغيل الصيانة';
+  }catch(e){ devMsg(e.message); }
+}
+async function setLimit(){
+  devMsg('');
+  try{ await dev('/api/developer/limit', { method: 'POST', body: JSON.stringify({ limit: Number($('dLimitIn').value) }) }); $('dLimitIn').value = ''; loadStats(); }
+  catch(e){ devMsg(e.message); }
+}
+async function adjust(delta){
+  devMsg('');
+  try{ await dev('/api/developer/adjust', { method: 'POST', body: JSON.stringify({ delta }) }); loadStats(); }
+  catch(e){ devMsg(e.message); }
+}
+async function toggleMaint(){
+  devMsg('');
+  try{ await dev('/api/developer/maintenance', { method: 'POST', body: JSON.stringify({ on: !maintOn }) }); loadStats(); }
+  catch(e){ devMsg(e.message); }
+}
+async function banAct(kind){
+  devMsg('');
+  const phone = $('dPhone').value.replace(/\D/g, '');
+  if(!phone){ devMsg('اكتب الرقم الأول'); return; }
+  try{ await dev('/api/developer/' + kind, { method: 'POST', body: JSON.stringify({ phone }) }); $('dPhone').value = ''; devMsg('تم'); loadStats(); loadNumbers(); }
+  catch(e){ devMsg(e.message); }
+}
+async function announce(){
+  devMsg(''); $('dAnnOk').textContent = '';
+  const announcement = $('dAnn').value.trim();
+  if(!announcement){ devMsg('اكتب الإعلان'); return; }
+  try{
+    const d = await dev('/api/developer/announce', { method: 'POST', body: JSON.stringify({ announcement }) });
+    $('dAnnOk').textContent = 'اتبعت لـ ' + d.sent + ' رقم';
+    $('dAnn').value = '';
+  }catch(e){ devMsg(e.message); }
+}
+async function loadCmds(period){
+  devMsg('');
+  try{
+    const rows = await dev('/api/developer/commands?period=' + period);
+    fillList($('dCmds'), rows.map(([cmd, n]) => cmd + ' — ' + n));
+  }catch(e){ devMsg(e.message); }
+}
+async function loadNumbers(){
+  devMsg('');
+  try{
+    const rows = await dev('/api/developer/numbers');
+    fillList($('dNums'), rows.map(x => x.number + ' — ' + x.status + (x.banned ? ' (محظور)' : '')));
+  }catch(e){ devMsg(e.message); }
+}
 </script>
 </body>
-      </html>
+          </html>
