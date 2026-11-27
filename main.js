@@ -4,6 +4,7 @@ const express = require("express");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const pino = require("pino");
 const baileys = require("@whiskeysockets/baileys");
 const database = require("./database/database");
@@ -14,6 +15,7 @@ const { useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } =
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const SESSION_DIR = path.join(DATA_DIR, "sessions");
+const PLUGINS_DIR = path.join(__dirname, "public", "plugins");
 const PAIRING_TIMEOUT_MS = 120000;
 const MAX_RECONNECTS = 5;
 const AI_MODEL = process.env.AI_MODEL || "claude-haiku-5-5";
@@ -21,6 +23,11 @@ const ADMIN_CODE = process.env.RICO_ADMIN_ACTIVATION_CODE;
 const ADMIN_HASH = ADMIN_CODE ? crypto.createHash("sha256").update(ADMIN_CODE).digest() : null;
 const PERIODS = { d: 864e5, w: 7 * 864e5, y: 365 * 864e5 };
 const AI_SYSTEM = "أنت RICO AI، مساعد لمنصة RICO BOT. اتكلم عربي عادي زي الكلام اليومي بين الناس، بجمل قصيرة وواضحة. رد دايماً برسالة واحدة متصلة، من غير تقسيم لرسايل أو مقدمات طويلة، ومن غير قوائم إلا لو المستخدم طلبها. ساعد في تنصيب البوت وحل مشاكل الربط، ولو السؤال خارج الموضوع ساعد بقدر المستطاع.";
+
+const ADMIN_NUMBERS = String(process.env.RICO_ADMIN_NUMBERS || "")
+  .split(",")
+  .map(v => String(v).replace(/\D/g, "").replace(/^0+/, ""))
+  .filter(Boolean);
 
 if (!ADMIN_CODE) {
   console.error("RICO_ADMIN_ACTIVATION_CODE is missing");
@@ -35,6 +42,11 @@ db.commands ||= {};
 db.bannedUsers ||= [];
 db.announcements ||= [];
 db.support ||= [];
+db.groups ||= {};
+db.users ||= {};
+
+// الـ plugins القديمة بتتوقع global.db و global.saveDB
+global.db = db;
 
 const sessions = new Map();    // phone -> { sock, status, reconnects, pairTimer }
 const adminTokens = new Map(); // token -> expiresAt
@@ -59,6 +71,7 @@ function flushDatabase() {
   saveTimer = null;
   try { database.save(db); } catch (e) { console.error("DB SAVE ERROR", e.message); }
 }
+global.saveDB = saveDatabase;
 
 function recordCommand(cmd) {
   if (!cmd) return;
@@ -79,14 +92,7 @@ function isSecure(req) {
 
 /* ================= الإضافات (plugins) ================= */
 
-const PLUGINS_DIR = path.join(__dirname, "plugins");
-const ADMIN_NUMBERS = String(process.env.RICO_ADMIN_NUMBERS || "")
-  .split(",")
-  .map(cleanPhone)
-  .filter(Boolean);
-const plugins = [];
-
-// الإضافات المدمجة: رد السلام وأوامر الأدمن
+// إضافات مدمجة: رد السلام وأوامر الأدمن
 const builtinPlugins = [
   {
     name: "greeting",
@@ -115,33 +121,73 @@ const builtinPlugins = [
   }
 ];
 
-// تحميل كل ملفات فولدر plugins تلقائياً
-// كل ملف يصدّر كائن أو مصفوفة كائنات بالشكل ده:
-// { name, admin?, commands?: ["cmd"], match?: (text, ctx) => bool, run: async ctx => {} }
-function loadPlugins() {
+const plugins = [];
+
+// يمشي على كل الفولدرات الفرعية جوه plugins
+function walk(dir) {
+  let out = [];
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) out = out.concat(walk(full));
+    else if (e.name.endsWith(".js")) out.push(full);
+  }
+  return out;
+}
+
+// يدعم شكلين:
+// 1) الفريمورك القديم: export default handler مع handler.command
+// 2) الشكل الجديد: { name, commands?, match?, run }
+async function loadPlugins() {
   plugins.length = 0;
   plugins.push(...builtinPlugins);
 
   if (!fs.existsSync(PLUGINS_DIR)) {
-    console.log("PLUGINS DIR NOT FOUND, using built-in only");
+    console.log("PLUGINS DIR NOT FOUND:", PLUGINS_DIR);
     return;
   }
 
-  for (const file of fs.readdirSync(PLUGINS_DIR)) {
-    if (!file.endsWith(".js")) continue;
-    const full = path.join(PLUGINS_DIR, file);
+  for (const full of walk(PLUGINS_DIR)) {
     try {
-      delete require.cache[require.resolve(full)];
-      const mod = require(full);
-      const list = Array.isArray(mod) ? mod : [mod];
+      // ?t= بيخلي إعادة التحميل تجيب النسخة الجديدة من الملف
+      const mod = await import(pathToFileURL(full).href + `?t=${Date.now()}`);
+      const exp = mod.default ?? mod;
+      const list = Array.isArray(exp) ? exp : [exp];
+
       for (const p of list) {
-        if (p && typeof p.run === "function") plugins.push({ file, ...p });
+        if (typeof p === "function") {
+          plugins.push({
+            file: full,
+            legacy: true,
+            handler: p,
+            command: p.command,
+            admin: p.admin,
+            group: p.group
+          });
+        } else if (p && typeof p.run === "function") {
+          plugins.push({ file: full, ...p });
+        }
       }
     } catch (e) {
-      console.error("PLUGIN LOAD ERROR", file, e.message);
+      console.error("PLUGIN LOAD ERROR", full, e.message);
     }
   }
   console.log("PLUGINS LOADED", plugins.length);
+}
+
+// هل الرقم أدمن في الجروب؟
+async function isGroupAdmin(sock, jid, sender) {
+  try {
+    const meta = await sock.groupMetadata(jid);
+    const p = meta.participants.find(x => cleanPhone(x.id) === sender);
+    return !!p && (p.admin === "admin" || p.admin === "superadmin");
+  } catch {
+    return false;
+  }
+}
+
+// الحظر من مكانين: bannedUsers (من الواجهة) و users (من أمر .بان القديم)
+function isBanned(sender) {
+  return db.bannedUsers.includes(sender) || !!db.users[`${sender}@s.whatsapp.net`]?.banned;
 }
 
 function getMessageText(m) {
@@ -165,29 +211,54 @@ async function handleIncoming(sock, { messages, type }) {
     if (!jid || jid === "status@broadcast") continue;
 
     const sender = cleanPhone(m.key.participant || jid);
-    if (db.bannedUsers.includes(sender)) continue;
+    if (isBanned(sender)) continue;
 
     const text = getMessageText(m);
     if (!text) continue;
 
+    const isGroup = jid.endsWith("@g.us");
     const isAdmin = ADMIN_NUMBERS.includes(sender);
     const firstWord = text.split(/\s+/)[0];
     const isCommand = firstWord.startsWith(".") || firstWord.startsWith("!");
     const cmdName = isCommand ? firstWord.slice(1).toLowerCase() : "";
     const args = text.split(/\s+/).slice(1);
 
-    const ctx = {
-      sock,
-      jid,
-      msg: m,
-      text,
+    const reply = t => sock.sendMessage(jid, { text: t }, { quoted: m });
+    const ctx = { sock, jid, msg: m, text, sender, args, isAdmin, reply };
+
+    // شكل الفريمورك القديم: m.chat و m.reply و m.mentionedJid
+    const legacyM = {
+      ...m,
+      chat: jid,
+      isGroup,
       sender,
-      args,
-      isAdmin,
-      reply: t => sock.sendMessage(jid, { text: t }, { quoted: m })
+      text,
+      mentionedJid: m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [],
+      reply
     };
 
     for (const plugin of plugins) {
+      if (plugin.legacy) {
+        const names = [].concat(plugin.command || []);
+        if (!isCommand || !names.includes(cmdName)) continue;
+        if (plugin.group && !isGroup) continue;
+        if (plugin.admin && !isAdmin) {
+          const groupAdmin = isGroup && (await isGroupAdmin(sock, jid, sender));
+          if (!groupAdmin) continue;
+        }
+        try {
+          await plugin.handler(legacyM, {
+            conn: sock,
+            command: cmdName,
+            args,
+            usedPrefix: firstWord[0]
+          });
+        } catch (e) {
+          console.error("PLUGIN RUN ERROR", plugin.file, e.message);
+        }
+        break;
+      }
+
       if (plugin.admin && !isAdmin) continue;
 
       let matched = false;
@@ -203,7 +274,7 @@ async function handleIncoming(sock, { messages, type }) {
       } catch (e) {
         console.error("PLUGIN RUN ERROR", plugin.name || plugin.file, e.message);
       }
-      break; // أول إضافة تطابق بترد وخلاص
+      break;
     }
   }
 }
@@ -224,11 +295,17 @@ async function createSocket(phone) {
     syncFullHistory: false
   });
 
+  // الفريمورك القديم بيستخدم buttonV2، ولو مش موجودة نرسل نص عادي
+  if (!sock.buttonV2) {
+    sock.buttonV2 = (jid, opts, extra) =>
+      sock.sendMessage(jid, { text: opts.text, footer: opts.footer }, extra);
+  }
+
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("messages.upsert", ({ messages, type }) => {
-    if (type !== "notify") return;
-    for (const m of messages) {
+  sock.ev.on("messages.upsert", ev => {
+    if (ev.type !== "notify") return;
+    for (const m of ev.messages) {
       if (m.key.fromMe) continue;
       const text = m.message?.conversation || m.message?.extendedTextMessage?.text || "";
       if (text.startsWith(".") || text.startsWith("!")) {
@@ -237,7 +314,6 @@ async function createSocket(phone) {
     }
   });
 
-  // الإضافة الجديدة: توجيه الرسائل للـ plugins
   sock.ev.on("messages.upsert", ev => {
     handleIncoming(sock, ev).catch(e => console.error("HANDLER ERROR", e.message));
   });
@@ -354,6 +430,9 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
+
+// منع تحميل ملفات الـ plugins من المتصفح (لازم يكون قبل express.static)
+app.use("/plugins", (req, res) => res.sendStatus(404));
 
 // ملفات الواجهة (CSS / JS / صور) من فولدر public
 app.use(express.static(path.join(__dirname, "public")));
@@ -639,8 +718,9 @@ app.get("/api/developer/numbers", requireAdmin, (req, res) => {
 
 const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`RICO server running on port ${PORT}`);
-  loadPlugins();
-  restoreAllSessions().catch(e => console.error("RESTORE ALL ERROR", e.message));
+  loadPlugins()
+    .then(() => restoreAllSessions())
+    .catch(e => console.error("STARTUP ERROR", e.message));
 });
 
 function shutdown() {
