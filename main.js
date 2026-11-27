@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "database");
 const SESSION_DIR = process.env.SESSION_DIR || path.join(__dirname, "sessions");
 const DB_FILE = path.join(DATA_DIR, "database.json");
-const PAIR_CODE = process.env.PAIRING_CODE || "RICO2010";
+const PAIRING_TIMEOUT_MS = 120000;
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(SESSION_DIR, { recursive: true });
@@ -93,6 +93,10 @@ function validPhone(phone) {
 function getToken(req) {
   const match = (req.headers.cookie || "").match(/(?:^|;\s*)rico_admin=([^;]+)/);
   return match ? match[1] : null;
+}
+
+function isSecure(req) {
+  return req.secure || req.headers["x-forwarded-proto"] === "https";
 }
 
 function cleanExpiredTokens() {
@@ -193,7 +197,7 @@ async function createSocket(phone, authPath) {
 
 // ================= SESSIONS =================
 
-function createSession(phone) {
+function createSession() {
   return {
     sock: null,
     state: null,
@@ -286,7 +290,7 @@ async function restoreSession(phone) {
   destroySession(phone);
 
   const authPath = path.join(SESSION_DIR, phone);
-  const session = createSession(phone);
+  const session = createSession();
   sessions.set(phone, session);
 
   const result = await createSocket(phone, authPath);
@@ -360,7 +364,7 @@ app.post("/api/pair", async (req, res) => {
   }
 
   const authPath = path.join(SESSION_DIR, phone);
-  const session = createSession(phone);
+  const session = createSession();
   sessions.set(phone, session);
 
   try {
@@ -368,15 +372,24 @@ app.post("/api/pair", async (req, res) => {
     session.sock = sock;
     session.state = state;
 
-    if (state.creds.registered) {
-      throw new Error("الرقم دا منصب أصلاً");
-    }
-
-    await sleep(2500);
-    const code = await sock.requestPairingCode(phone, PAIR_CODE);
+    // الربط لازم يتسجل قبل طلب الكود عشان ما يفوتش أي حدث
     attachConnectionEvents(phone, session, authPath);
 
-    return res.json({ success: true, code, expiresIn: 60, message: "أدخل كود الربط في واتساب" });
+    await sleep(2500);
+
+    // كود عشوائي من واتساب (بدون تمرير كود مخصص)
+    const code = await sock.requestPairingCode(phone);
+
+    // لو الكود ما اتدخلش خلال المهلة، نحذف الطلب عشان الرقم ما يفضلش محجوز
+    setTimeout(() => {
+      const s = sessions.get(phone);
+      if (s === session && s.status !== "connected" && !isRegistered(phone)) {
+        destroySession(phone);
+        fs.rmSync(authPath, { recursive: true, force: true });
+      }
+    }, PAIRING_TIMEOUT_MS);
+
+    return res.json({ success: true, code, expiresIn: PAIRING_TIMEOUT_MS / 1000, message: "أدخل كود الربط في واتساب" });
   } catch (error) {
     console.error("PAIR ERROR:", error.message);
     db.failedConnections++;
@@ -429,20 +442,18 @@ app.post("/api/developer/login", (req, res) => {
   const token = crypto.randomBytes(32).toString("hex");
   adminTokens.set(token, Date.now() + 8 * 60 * 60 * 1000);
 
-  const secure = req.secure || req.headers["x-forwarded-proto"] === "https";
   res.setHeader(
     "Set-Cookie",
-    `rico_admin=${token}; HttpOnly; ${secure ? "Secure; " : ""}SameSite=Lax; Path=/; Max-Age=28800`
+    `rico_admin=${token}; HttpOnly; ${isSecure(req) ? "Secure; " : ""}SameSite=Lax; Path=/; Max-Age=28800`
   );
   res.json({ success: true });
 });
 
 app.post("/api/developer/logout", requireAdmin, (req, res) => {
   adminTokens.delete(getToken(req));
-  const secure = req.secure || req.headers["x-forwarded-proto"] === "https";
   res.setHeader(
     "Set-Cookie",
-    `rico_admin=; HttpOnly; ${secure ? "Secure; " : ""}SameSite=Lax; Path=/; Max-Age=0`
+    `rico_admin=; HttpOnly; ${isSecure(req) ? "Secure; " : ""}SameSite=Lax; Path=/; Max-Age=0`
   );
   res.json({ success: true });
 });
@@ -557,13 +568,20 @@ app.use((error, req, res, next) => {
 
 // ================= START =================
 
-process.on("SIGINT", () => {
+function flushDatabaseSync() {
   try {
     fs.writeFileSync(DB_FILE + ".tmp", JSON.stringify(db, null, 2));
     fs.renameSync(DB_FILE + ".tmp", DB_FILE);
   } catch {}
+}
+
+function shutdown() {
+  flushDatabaseSync();
   process.exit(0);
-});
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 app.listen(PORT, () => {
   console.log("RICO BOT SERVER STARTED:", PORT);
