@@ -20,7 +20,7 @@ const AI_MODEL = process.env.AI_MODEL || "claude-haiku-5-5";
 const ADMIN_CODE = process.env.RICO_ADMIN_ACTIVATION_CODE;
 const ADMIN_HASH = ADMIN_CODE ? crypto.createHash("sha256").update(ADMIN_CODE).digest() : null;
 const PERIODS = { d: 864e5, w: 7 * 864e5, y: 365 * 864e5 };
-const AI_SYSTEM = "أنت RICO AI، مساعد ذكي لمنصة RICO BOT. ترد بالعربي بوضوح واختصار، وتساعد في تنصيب البوت وحل مشاكل الربط. لو السؤال خارج الموضوع ساعد بقدر المستطاع.";
+const AI_SYSTEM = "أنت RICO AI، مساعد لمنصة RICO BOT. اتكلم عربي عادي زي الكلام اليومي بين الناس، بجمل قصيرة وواضحة. رد دايماً برسالة واحدة متصلة، من غير تقسيم لرسايل أو مقدمات طويلة، ومن غير قوائم إلا لو المستخدم طلبها. ساعد في تنصيب البوت وحل مشاكل الربط، ولو السؤال خارج الموضوع ساعد بقدر المستطاع.";
 
 if (!ADMIN_CODE) {
   console.error("RICO_ADMIN_ACTIVATION_CODE is missing");
@@ -219,9 +219,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// الصفحة الرئيسية: index.html لازم يكون جنب main.js
+// ملفات الواجهة (CSS / JS / صور) من فولدر public
+app.use(express.static(path.join(__dirname, "public")));
+
+// الصفحة الرئيسية: public/index.html
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 function requireAdmin(req, res, next) {
@@ -363,7 +366,14 @@ app.post("/api/ai", async (req, res) => {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error?.message || "anthropic error");
-    const reply = (d.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+    // نجمع كل الأجزاء في فقرة واحدة عشان الرد يطلع رسالة واحدة بس
+    const reply = (d.content || [])
+      .filter(b => b.type === "text")
+      .map(b => b.text)
+      .join(" ")
+      .replace(/\s*\n+\s*/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
     res.json({ success: true, reply: reply || "ما قدرت أرد، جرب تاني." });
   } catch (e) {
     console.error("AI ERROR", e.message);
