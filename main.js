@@ -15,7 +15,7 @@ const { useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } =
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const SESSION_DIR = path.join(DATA_DIR, "sessions");
-const PLUGINS_DIR = path.join(__dirname, "public", "plugins");
+const PLUGINS_DIR = path.join(__dirname, "plugins");
 const PAIRING_TIMEOUT_MS = 120000;
 const MAX_RECONNECTS = 5;
 const AI_MODEL = process.env.AI_MODEL || "claude-haiku-5-5";
@@ -23,6 +23,14 @@ const ADMIN_CODE = process.env.RICO_ADMIN_ACTIVATION_CODE;
 const ADMIN_HASH = ADMIN_CODE ? crypto.createHash("sha256").update(ADMIN_CODE).digest() : null;
 const PERIODS = { d: 864e5, w: 7 * 864e5, y: 365 * 864e5 };
 const AI_SYSTEM = "أنت RICO AI، مساعد لمنصة RICO BOT. اتكلم عربي عادي زي الكلام اليومي بين الناس، بجمل قصيرة وواضحة. رد دايماً برسالة واحدة متصلة، من غير تقسيم لرسايل أو مقدمات طويلة، ومن غير قوائم إلا لو المستخدم طلبها. ساعد في تنصيب البوت وحل مشاكل الربط، ولو السؤال خارج الموضوع ساعد بقدر المستطاع.";
+
+const WELCOME_TEXT =
+  "*⪩ تم ربط رقمك في RICO BOT ✅ ↯ •*\n" +
+  "── ⋅ ⋅ ── 🪻 ── ⋅ ⋅ ──\n\n" +
+  "البوت شغال دلوقتي 🎉\n" +
+  "اكتب *جرب* أو *.اوامر* عشان تشوف الأقسام\n\n" +
+  "── ⋅ ⋅ ── 🪻 ── ⋅ ⋅ ──\n" +
+  "> ⦂ RICO BOT ╷";
 
 const ADMIN_NUMBERS = String(process.env.RICO_ADMIN_NUMBERS || "")
   .split(",")
@@ -44,6 +52,7 @@ db.announcements ||= [];
 db.support ||= [];
 db.groups ||= {};
 db.users ||= {};
+db.welcomed ||= [];
 
 // الـ plugins القديمة بتتوقع global.db و global.saveDB
 global.db = db;
@@ -109,7 +118,7 @@ const menuPlugin = {
   category: "other",
   commands: ["اوامر", "menu", "قائمة"],
   run: async ctx => {
-    const sections = buildSections();
+    const sections = buildSections(ctx.isAdmin);
     if (!sections.length) return ctx.reply("ما في أوامر محملة حالياً.");
 
     const arg = ctx.args[0];
@@ -229,10 +238,11 @@ async function loadPlugins() {
   console.log("COMMANDS:", names.join(", "));
 }
 
-// يبني الأقسام للقائمة من الملفات نفسها
-function buildSections() {
+// يبني الأقسام للقائمة من الملفات نفسها، ويخفي أقسام الأدمن عن غيره
+function buildSections(isAdmin) {
   const map = new Map();
   for (const p of plugins) {
+    if (p.admin && !isAdmin) continue;
     const names = p.legacy ? p.usage : (p.commands || []);
     if (!names || !names.length) continue;
     const key = p.category || "other";
@@ -430,6 +440,16 @@ function attachConnectionEvents(phone, sock) {
       db.totalConnections++;
       saveDatabase();
       console.log("LINKED", phone);
+
+      // رسالة ترحيب مرة واحدة بس لكل رقم
+      if (!db.welcomed.includes(phone)) {
+        db.welcomed.push(phone);
+        saveDatabase();
+        setTimeout(() => {
+          sock.sendMessage(`${phone}@s.whatsapp.net`, { text: WELCOME_TEXT })
+            .catch(e => console.error("WELCOME ERROR", phone, e.message));
+        }, 1500);
+      }
       return;
     }
 
@@ -518,10 +538,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// منع تحميل ملفات الـ plugins من المتصفح (لازم يكون قبل express.static)
-app.use("/plugins", (req, res) => res.sendStatus(404));
-
 // ملفات الواجهة (CSS / JS / صور) من فولدر public
+// فولدر plugins في جذر المشروع، فمش متاح للمتصفح أصلاً
 app.use(express.static(path.join(__dirname, "public")));
 
 // الصفحة الرئيسية: public/index.html
