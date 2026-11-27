@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RICO BOT</title>
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Rakkas&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root{--p:#8b5cf6;--b:#38bdf8;--bg:#07060f;--card:#110e22;--line:#2a2250;--tx:#ece9ff;--mut:#8f88b8}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:var(--bg);color:var(--tx);font-family:'Rakkas',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+body{background:var(--bg);color:var(--tx);font-family:'Cairo',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
 body::before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 20% 0,#8b5cf633,transparent 50%),radial-gradient(circle at 90% 100%,#38bdf833,transparent 50%);pointer-events:none}
 .en{font-family:'Bangers',cursive;letter-spacing:3px}
 /* ===== Splash ===== */
@@ -396,24 +396,35 @@ function copyCode(){
 
 /* ===== الذكاء ===== */
 const KB=[
+ [/^(السلام|سلام|مرحبا|مرحباً|اهلا|أهلا|هاي|هلا)/,'وعليكم السلام 👋 كيف أقدر أساعدك؟'],
  [/ربط|تنصيب|كيف/,'اكتب رقمك في صفحة التنصيب، اضغط ربط، وبعدين أدخل الكود في واتساب ← الأجهزة المرتبطة ← ربط برقم الهاتف.'],
- [/ما شغال|مش شغال|خطأ|تعذر/,'تأكد إنك دخلت الكود في أقل من دقيقتين، والرقم من غير صفر. لو استمرت المشكلة ابعتها من صفحة الدعم.'],
- [/مجاني|سعر|فلوس/,'التنصيب مجاني ✨'],
+ [/كود|الكود/,'الكود بيتولد بعد ما تكتب رقمك وتضغط ربط. عندك دقيقتين تدخله في واتساب، ولو انتهى اطلب كود جديد.'],
+ [/ما شغال|مش شغال|خطأ|تعذر|غلط|مشكلة/,'تأكد إنك دخلت الكود في أقل من دقيقتين، والرقم من غير صفر. لو استمرت المشكلة ابعتها من صفحة الدعم.'],
+ [/مجاني|سعر|فلوس|تكلفة|بكم/,'التنصيب مجاني ✨'],
+ [/اوامر|أوامر|امر|أمر/,'اكتب .اوامر في البوت عشان تشوف قايمة الأقسام.'],
+ [/ريكو|اسمك|مين انت|انت مين|بوت/,'أنا RICO AI، مساعد منصة RICO BOT.'],
+ [/دعم|بلاغ|تواصل/,'اكتب مشكلتك في صفحة الدعم، وبنرد عليك في أقرب وقت.'],
 ];
+const FALLBACK='ما فهمتش سؤالك بالظبط. جرّب تكتب: ربط، كود، أوامر، مجاني، أو اكتب مشكلتك في صفحة الدعم.';
+function localAnswer(text){
+  const m = KB.find(k => k[0].test(text.trim()));
+  return m ? m[1] : FALLBACK;
+}
 async function ask(t){
   const q=$('q'); const text=t||q.value.trim(); if(!text) return; q.value='';
   add(text,'me');
-  if(!API){ setTimeout(()=>{ const m=KB.find(k=>k[0].test(text)); add(m?m[1]:'جرب صفحة الدعم لو محتاج مساعدة.','bot') },400); return; }
   add('...','bot');
-  try{
-    const r=await fetch(API+'/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
-    const d=await r.json();
-    $('chat').lastChild.remove();
-    add(d.reply || d.message,'bot');
-  }catch(e){
-    $('chat').lastChild.remove();
-    add('تعذر الاتصال بالسيرفر','bot');
+  let reply=null;
+  if(API){
+    try{
+      const r=await fetch(API+'/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      const d=await r.json();
+      if(r.ok && d.reply) reply=d.reply;
+    }catch(e){}
   }
+  if(!reply) reply=localAnswer(text);
+  $('chat').lastChild.remove();
+  add(reply,'bot');
 }
 function add(t,w){ const d=document.createElement('div'); d.className='msg '+w; d.textContent=t; $('chat').appendChild(d); $('chat').scrollTop=1e9 }
 
@@ -538,4 +549,4 @@ async function loadNumbers(){
 }
 </script>
 </body>
-          </html>
+  </html>
