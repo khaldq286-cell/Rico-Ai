@@ -219,6 +219,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// الصفحة الرئيسية: index.html لازم يكون جنب main.js
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 function requireAdmin(req, res, next) {
   const token = getCookie(req, "rico_admin");
   const exp = token && adminTokens.get(token);
