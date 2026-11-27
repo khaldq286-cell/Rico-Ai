@@ -36,7 +36,7 @@ db.bannedUsers ||= [];
 db.announcements ||= [];
 db.support ||= [];
 
-const sessions = new Map();   // phone -> { sock, status, reconnects, pairTimer }
+const sessions = new Map();    // phone -> { sock, status, reconnects, pairTimer }
 const adminTokens = new Map(); // token -> expiresAt
 
 /* ================= helpers ================= */
@@ -77,6 +77,137 @@ function isSecure(req) {
   return req.secure || req.headers["x-forwarded-proto"] === "https";
 }
 
+/* ================= الإضافات (plugins) ================= */
+
+const PLUGINS_DIR = path.join(__dirname, "plugins");
+const ADMIN_NUMBERS = String(process.env.RICO_ADMIN_NUMBERS || "")
+  .split(",")
+  .map(cleanPhone)
+  .filter(Boolean);
+const plugins = [];
+
+// الإضافات المدمجة: رد السلام وأوامر الأدمن
+const builtinPlugins = [
+  {
+    name: "greeting",
+    match: text => /^(ال)?سلام/.test(text),
+    run: async ctx => {
+      await ctx.reply("وعليكم السلام ورحمة الله 👋");
+    }
+  },
+  {
+    name: "admin-stats",
+    admin: true,
+    commands: ["stats"],
+    run: async ctx => {
+      await ctx.reply(`الأرقام المتصلة: ${connectedCount()}\nالحد الأقصى: ${effectiveLimit()}`);
+    }
+  },
+  {
+    name: "admin-maintenance",
+    admin: true,
+    commands: ["maintenance"],
+    run: async ctx => {
+      db.maintenance = !db.maintenance;
+      saveDatabase();
+      await ctx.reply(db.maintenance ? "تم تفعيل وضع الصيانة" : "تم إيقاف وضع الصيانة");
+    }
+  }
+];
+
+// تحميل كل ملفات فولدر plugins تلقائياً
+// كل ملف يصدّر كائن أو مصفوفة كائنات بالشكل ده:
+// { name, admin?, commands?: ["cmd"], match?: (text, ctx) => bool, run: async ctx => {} }
+function loadPlugins() {
+  plugins.length = 0;
+  plugins.push(...builtinPlugins);
+
+  if (!fs.existsSync(PLUGINS_DIR)) {
+    console.log("PLUGINS DIR NOT FOUND, using built-in only");
+    return;
+  }
+
+  for (const file of fs.readdirSync(PLUGINS_DIR)) {
+    if (!file.endsWith(".js")) continue;
+    const full = path.join(PLUGINS_DIR, file);
+    try {
+      delete require.cache[require.resolve(full)];
+      const mod = require(full);
+      const list = Array.isArray(mod) ? mod : [mod];
+      for (const p of list) {
+        if (p && typeof p.run === "function") plugins.push({ file, ...p });
+      }
+    } catch (e) {
+      console.error("PLUGIN LOAD ERROR", file, e.message);
+    }
+  }
+  console.log("PLUGINS LOADED", plugins.length);
+}
+
+function getMessageText(m) {
+  const msg = m.message || {};
+  return (
+    msg.conversation ||
+    msg.extendedTextMessage?.text ||
+    msg.imageMessage?.caption ||
+    msg.videoMessage?.caption ||
+    ""
+  ).trim();
+}
+
+async function handleIncoming(sock, { messages, type }) {
+  if (type !== "notify") return;
+
+  for (const m of messages) {
+    if (m.key.fromMe) continue;
+
+    const jid = m.key.remoteJid;
+    if (!jid || jid === "status@broadcast") continue;
+
+    const sender = cleanPhone(m.key.participant || jid);
+    if (db.bannedUsers.includes(sender)) continue;
+
+    const text = getMessageText(m);
+    if (!text) continue;
+
+    const isAdmin = ADMIN_NUMBERS.includes(sender);
+    const firstWord = text.split(/\s+/)[0];
+    const isCommand = firstWord.startsWith(".") || firstWord.startsWith("!");
+    const cmdName = isCommand ? firstWord.slice(1).toLowerCase() : "";
+    const args = text.split(/\s+/).slice(1);
+
+    const ctx = {
+      sock,
+      jid,
+      msg: m,
+      text,
+      sender,
+      args,
+      isAdmin,
+      reply: t => sock.sendMessage(jid, { text: t }, { quoted: m })
+    };
+
+    for (const plugin of plugins) {
+      if (plugin.admin && !isAdmin) continue;
+
+      let matched = false;
+      if (typeof plugin.match === "function") {
+        matched = !!plugin.match(text, ctx);
+      } else if (Array.isArray(plugin.commands)) {
+        matched = isCommand && plugin.commands.includes(cmdName);
+      }
+      if (!matched) continue;
+
+      try {
+        await plugin.run(ctx);
+      } catch (e) {
+        console.error("PLUGIN RUN ERROR", plugin.name || plugin.file, e.message);
+      }
+      break; // أول إضافة تطابق بترد وخلاص
+    }
+  }
+}
+
 /* ================= WhatsApp sessions ================= */
 
 async function createSocket(phone) {
@@ -104,6 +235,11 @@ async function createSocket(phone) {
         recordCommand(text.trim().split(/\s+/)[0].slice(1).toLowerCase());
       }
     }
+  });
+
+  // الإضافة الجديدة: توجيه الرسائل للـ plugins
+  sock.ev.on("messages.upsert", ev => {
+    handleIncoming(sock, ev).catch(e => console.error("HANDLER ERROR", e.message));
   });
 
   return sock;
@@ -307,6 +443,7 @@ app.post("/api/pair", async (req, res) => {
     }
 
     res.json({ success: true, code });
+
   } catch (e) {
     console.error("PAIR ERROR", e.message);
     db.failedConnections++;
@@ -502,6 +639,7 @@ app.get("/api/developer/numbers", requireAdmin, (req, res) => {
 
 const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`RICO server running on port ${PORT}`);
+  loadPlugins();
   restoreAllSessions().catch(e => console.error("RESTORE ALL ERROR", e.message));
 });
 
